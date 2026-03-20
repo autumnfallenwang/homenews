@@ -1,0 +1,17 @@
+{
+  "name": "homenews",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "test:fast": "turbo test:fast",
+    "lint": "turbo lint",
+    "lint:fix": "turbo lint:fix"
+  },
+  "devDependencies": {
+    "turbo": "^2.8.10"
+  }
+}
