@@ -4,11 +4,11 @@
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 1 | Monorepo scaffold | Not started | Turborepo + pnpm, Hono API + Next.js Web + shared package, Biome + Vitest |
-| 2 | PostgreSQL + Drizzle ORM schema | Not started | feeds, articles tables |
-| 3 | RSS fetcher service | Not started | Parse RSS/Atom feeds |
-| 4 | Scheduled feed ingestion | Not started | node-cron in API process |
-| 5 | Feed management API | Not started | CRUD feeds, manual trigger fetch |
+| 1 | Monorepo scaffold | Done | Turborepo + pnpm, Hono API + Next.js Web + shared package, Biome + Vitest |
+| 2 | PostgreSQL + Drizzle ORM schema | Done | feeds, articles tables + Drizzle config + seed script |
+| 3 | RSS fetcher service | Done | rss-parser + mapper + feed-fetcher service |
+| 4 | Scheduled feed ingestion | Done | node-cron scheduler with noOverlap, configurable FETCH_INTERVAL |
+| 5 | Feed management API | Done | CRUD + manual fetch triggers, Zod validation |
 
 ## Phase 2: LLM Processing
 
@@ -40,10 +40,19 @@
 ## What's Working
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
+- Monorepo: Turborepo + pnpm workspace with 3 packages (api, web, shared)
+- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers)
+- Web: Next.js App Router on port 3000 with Tailwind CSS v4
+- Shared: Zod schemas for Feed, Article, CreateFeed, UpdateFeed consumed by api and web
+- Database: Drizzle ORM schema (feeds, articles), postgres.js connection, drizzle-kit config, seed script with 9 AI/LLM feeds
+- RSS Fetcher: rss-parser integration with pure mapping layer, fetchFeed/fetchAllFeeds services, duplicate handling via onConflictDoNothing
+- Scheduler: node-cron job runs fetchAllFeeds every 30 min (configurable via FETCH_INTERVAL), noOverlap protection, start/stop exports
+- Tooling: Biome lint, Vitest (29 tests passing), TypeScript strict mode
+- DB scripts: Docker-based PostgreSQL start/stop/reset
 
 ## What's Next
 
-Task 1: Scaffold monorepo.
+Task 6: Deduplication (URL + title similarity).
 
 ## Reference Docs
 
