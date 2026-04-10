@@ -68,12 +68,17 @@ Ranked     { id, articleId, score, tags, cluster, llmSummary, rankedAt }
 13. Article detail view
 14. Filter/search controls
 
-### Phase 4 — iOS App
-15. iOS project setup
-16. Feed reader view
-17. Push notifications for high-score articles
+### Phase 4 — LLM Registry Refactor
+15. LLM task registry — central config for prompts, models, output formats per task
+16. Per-task model config — env var overrides (LLM_MODEL_SCORING, LLM_MODEL_SUMMARIZATION, etc.)
+17. Unified LLM executor — single llmExecute() with auto-parsing, fallback, logging
 
-### Phase 5 — Future Enhancements (deferred)
+### Phase 5 — iOS App
+18. iOS project setup
+19. Feed reader view
+20. Push notifications for high-score articles
+
+### Phase 6 — Future Enhancements (deferred)
 - Full article fetching for thin feeds
 - Custom topic profiles
 - Trend detection over time

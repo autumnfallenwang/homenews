@@ -24,25 +24,33 @@
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 11 | Dashboard | Not started | Today's ranked feed |
-| 12 | Feed management page | Not started | Add/remove/toggle feeds |
-| 13 | Article detail view | Not started | Full content + LLM summary |
-| 14 | Filter/search controls | Not started | By topic, source, date |
+| 11 | Dashboard | Done | Server-component dashboard with stats, cluster filters, article cards, shadcn/ui |
+| 12 | Feed management page | Done | /feeds page with table, add dialog, enable/disable toggle, delete, manual fetch trigger |
+| 13 | Article detail view | Done | /article/[id] detail page with AI summary, metadata, tags, original link |
+| 14 | Filter/search controls | Done | Cluster filter via URL params, text search, source filter (all client-side) |
 
-## Phase 4: iOS App
+## Phase 4: LLM Registry Refactor
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 15 | iOS project setup | Not started | Swift package, API client |
-| 16 | Feed reader view | Not started | Ranked articles list |
-| 17 | Push notifications | Not started | High-score article alerts |
+| 15 | LLM task registry | Not started | Central config for all LLM tasks (prompts, models, output formats) |
+| 16 | Per-task model config | Not started | Env var overrides per task (LLM_MODEL_SCORING, etc.) |
+| 17 | Unified LLM executor | Not started | Single llmExecute() with auto-parsing, fallback, logging |
+
+## Phase 5: iOS App
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 18 | iOS project setup | Not started | Swift package, API client |
+| 19 | Feed reader view | Not started | Ranked articles list |
+| 20 | Push notifications | Not started | High-score article alerts |
 
 ## What's Working
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
 - Monorepo: Turborepo + pnpm workspace with 3 packages (api, web, shared)
 - API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (list/filter/paginate, clusters, detail)
-- Web: Next.js App Router on port 3000 with Tailwind CSS v4
+- Web: Next.js App Router on port 3000 with Tailwind CSS v4 + shadcn/ui components + dashboard (with cluster/search/source filters) + feed management page + article detail view
 - Shared: Zod schemas for Feed, Article, Ranked, RankedArticle, ClusterInfo, CreateFeed, UpdateFeed consumed by api and web
 - Database: Drizzle ORM schema (feeds, articles, ranked), postgres.js connection, drizzle-kit config, seed script with 9 AI/LLM feeds
 - RSS Fetcher: rss-parser integration with pure mapping layer, fetchFeed/fetchAllFeeds services, duplicate handling via onConflictDoNothing
@@ -56,7 +64,7 @@
 
 ## What's Next
 
-Task 11: Dashboard — today's ranked feed (Phase 3: Web UI begins).
+Debug current pipeline, then Task 15: LLM task registry (Phase 4: LLM Registry Refactor).
 
 ## Reference Docs
 

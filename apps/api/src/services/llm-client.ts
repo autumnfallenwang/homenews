@@ -20,10 +20,13 @@ export async function chatCompletion(
   }
   messages.push({ role: "user", content: prompt });
 
+  const model = options?.model ?? defaultModel;
+  const isCodex = model.includes("codex") || model.startsWith("gpt-5");
+
   const response = await llm.chat.completions.create({
-    model: options?.model ?? defaultModel,
+    model,
     messages,
-    temperature: 0.2,
+    ...(isCodex ? {} : { temperature: 0.2 }),
   });
 
   return response.choices[0]?.message?.content ?? "";
