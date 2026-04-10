@@ -1,6 +1,6 @@
 import { getTableColumns, getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { articles, feeds } from "../src/db/schema.js";
+import { articles, feeds, ranked } from "../src/db/schema.js";
 
 describe("feeds table", () => {
   it("has correct table name", () => {
@@ -48,6 +48,7 @@ describe("articles table", () => {
         "author",
         "publishedAt",
         "fetchedAt",
+        "duplicateOfId",
       ].sort(),
     );
   });
@@ -67,5 +68,34 @@ describe("articles table", () => {
     expect(cols.content.notNull).toBe(false);
     expect(cols.author.notNull).toBe(false);
     expect(cols.publishedAt.notNull).toBe(false);
+    expect(cols.duplicateOfId.notNull).toBe(false);
+  });
+});
+
+describe("ranked table", () => {
+  it("has correct table name", () => {
+    expect(getTableName(ranked)).toBe("ranked");
+  });
+
+  it("has all expected columns", () => {
+    const cols = getTableColumns(ranked);
+    expect(Object.keys(cols).sort()).toEqual(
+      ["id", "articleId", "score", "tags", "cluster", "llmSummary", "rankedAt"].sort(),
+    );
+  });
+
+  it("has notNull on required columns", () => {
+    const cols = getTableColumns(ranked);
+    expect(cols.id.notNull).toBe(true);
+    expect(cols.articleId.notNull).toBe(true);
+    expect(cols.score.notNull).toBe(true);
+    expect(cols.rankedAt.notNull).toBe(true);
+  });
+
+  it("allows null on optional columns", () => {
+    const cols = getTableColumns(ranked);
+    expect(cols.tags.notNull).toBe(false);
+    expect(cols.cluster.notNull).toBe(false);
+    expect(cols.llmSummary.notNull).toBe(false);
   });
 });

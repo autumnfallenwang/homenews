@@ -14,11 +14,11 @@
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 6 | Deduplication | Not started | URL + title similarity |
-| 7 | LLM filtering | Not started | Relevance scoring |
-| 8 | LLM clustering | Not started | Group related articles |
-| 9 | LLM summarization | Not started | Per-article and per-cluster |
-| 10 | Ranked articles API | Not started | Serve processed feed |
+| 6 | Deduplication | Done | URL unique constraint + bigram title similarity (Dice coefficient) |
+| 7 | LLM filtering | Done | OpenAI-compatible LLM client + relevance scoring (0-100) + ranked table |
+| 8 | LLM clustering | Done | Batch LLM clustering with topic labels |
+| 9 | LLM summarization | Done | Per-article summaries via LLM, stored in ranked.llmSummary |
+| 10 | Ranked articles API | Done | GET /ranked (list, filter, paginate), GET /ranked/clusters, GET /ranked/:id |
 
 ## Phase 3: Web UI
 
@@ -41,18 +41,22 @@
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
 - Monorepo: Turborepo + pnpm workspace with 3 packages (api, web, shared)
-- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers)
+- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (list/filter/paginate, clusters, detail)
 - Web: Next.js App Router on port 3000 with Tailwind CSS v4
-- Shared: Zod schemas for Feed, Article, CreateFeed, UpdateFeed consumed by api and web
-- Database: Drizzle ORM schema (feeds, articles), postgres.js connection, drizzle-kit config, seed script with 9 AI/LLM feeds
+- Shared: Zod schemas for Feed, Article, Ranked, RankedArticle, ClusterInfo, CreateFeed, UpdateFeed consumed by api and web
+- Database: Drizzle ORM schema (feeds, articles, ranked), postgres.js connection, drizzle-kit config, seed script with 9 AI/LLM feeds
 - RSS Fetcher: rss-parser integration with pure mapping layer, fetchFeed/fetchAllFeeds services, duplicate handling via onConflictDoNothing
 - Scheduler: node-cron job runs fetchAllFeeds every 30 min (configurable via FETCH_INTERVAL), noOverlap protection, start/stop exports
-- Tooling: Biome lint, Vitest (29 tests passing), TypeScript strict mode
+- Deduplication: URL-level via unique constraint + title similarity via bigram Dice coefficient, runs inline during fetch, 48h window
+- LLM Scoring: OpenAI-compatible client via local llmgw, relevance scoring (0-100 + tags), runs after fetch in scheduler, graceful error handling
+- LLM Clustering: Batch clustering of scored articles into topic groups, labels stored in ranked.cluster
+- LLM Summarization: Per-article 2-3 sentence summaries via LLM, stored in ranked.llmSummary, runs after clustering in scheduler pipeline
+- Tooling: Biome lint, Vitest (82 tests passing), TypeScript strict mode
 - DB scripts: Docker-based PostgreSQL start/stop/reset
 
 ## What's Next
 
-Task 6: Deduplication (URL + title similarity).
+Task 11: Dashboard — today's ranked feed (Phase 3: Web UI begins).
 
 ## Reference Docs
 

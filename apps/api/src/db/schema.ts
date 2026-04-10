@@ -1,4 +1,4 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const feeds = pgTable("feeds", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -22,4 +22,18 @@ export const articles = pgTable("articles", {
   author: text("author"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  duplicateOfId: uuid("duplicate_of_id"),
+});
+
+export const ranked = pgTable("ranked", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  articleId: uuid("article_id")
+    .notNull()
+    .references(() => articles.id)
+    .unique(),
+  score: integer("score").notNull(),
+  tags: text("tags").array(),
+  cluster: text("cluster"),
+  llmSummary: text("llm_summary"),
+  rankedAt: timestamp("ranked_at", { withTimezone: true }).notNull().defaultNow(),
 });

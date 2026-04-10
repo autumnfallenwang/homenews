@@ -46,6 +46,46 @@ export const articleSchema = z.object({
   author: z.string().nullable(),
   publishedAt: z.string().nullable(),
   fetchedAt: z.string(),
+  duplicateOfId: z.string().uuid().nullable(),
 });
 
 export type Article = z.infer<typeof articleSchema>;
+
+export const rankedSchema = z.object({
+  id: z.string().uuid(),
+  articleId: z.string().uuid(),
+  score: z.number().int().min(0).max(100),
+  tags: z.array(z.string()).nullable(),
+  cluster: z.string().nullable(),
+  llmSummary: z.string().nullable(),
+  rankedAt: z.string(),
+});
+
+export type Ranked = z.infer<typeof rankedSchema>;
+
+export const rankedArticleSchema = z.object({
+  id: z.string().uuid(),
+  articleId: z.string().uuid(),
+  score: z.number().int().min(0).max(100),
+  tags: z.array(z.string()).nullable(),
+  cluster: z.string().nullable(),
+  llmSummary: z.string().nullable(),
+  rankedAt: z.string(),
+  article: z.object({
+    title: z.string(),
+    link: z.url(),
+    summary: z.string().nullable(),
+    author: z.string().nullable(),
+    publishedAt: z.string().nullable(),
+    feedName: z.string(),
+  }),
+});
+
+export type RankedArticle = z.infer<typeof rankedArticleSchema>;
+
+export const clusterInfoSchema = z.object({
+  cluster: z.string(),
+  count: z.number().int(),
+});
+
+export type ClusterInfo = z.infer<typeof clusterInfoSchema>;

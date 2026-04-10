@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import Parser from "rss-parser";
 import { db } from "../db/index.js";
 import { articles, feeds } from "../db/schema.js";
+import { findDuplicate } from "./dedup.js";
 import { mapRssItem } from "./rss-mapper.js";
 
 const parser = new Parser({ timeout: 10_000 });
@@ -31,8 +32,16 @@ export async function fetchFeed(feed: {
         .insert(articles)
         .values(items)
         .onConflictDoNothing({ target: articles.link })
-        .returning({ id: articles.id });
+        .returning({ id: articles.id, title: articles.title });
       result.added = inserted.length;
+
+      // Run title-based dedup on newly inserted articles
+      for (const article of inserted) {
+        const duplicateOfId = await findDuplicate(article.title, article.id);
+        if (duplicateOfId) {
+          await db.update(articles).set({ duplicateOfId }).where(eq(articles.id, article.id));
+        }
+      }
     }
 
     await db.update(feeds).set({ lastFetchedAt: new Date() }).where(eq(feeds.id, feed.id));
