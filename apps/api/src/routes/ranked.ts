@@ -37,18 +37,20 @@ async function loadCompositeSettings(): Promise<CompositeSettings> {
 }
 
 function buildFreshnessExpr(lambda: number) {
-  return sql<number>`EXP(-${lambda} * EXTRACT(EPOCH FROM (NOW() - COALESCE(${articleAnalysisWithFeed.articlePublishedAt}, ${articleAnalysisWithFeed.articleFetchedAt}))) / 3600.0)`;
+  // Cast lambda param to real so PG can resolve the unary minus operator.
+  return sql<number>`EXP(-(${lambda}::real) * EXTRACT(EPOCH FROM (NOW() - COALESCE(${articleAnalysisWithFeed.articlePublishedAt}, ${articleAnalysisWithFeed.articleFetchedAt}))) / 3600.0)`;
 }
 
 function buildCompositeExpr(s: CompositeSettings) {
   const freshness = buildFreshnessExpr(s.freshness_lambda);
-  // uniqueness is hardcoded to 1.0 for now — real uniqueness signal deferred
+  // All weight params cast to ::real so PG can pick the right multiplication operator.
+  // Uniqueness is hardcoded to 1.0 for now — real uniqueness signal deferred.
   return sql<number>`
-    ${s.weight_relevance} * (${articleAnalysisWithFeed.relevance}::real / 100)
-    + ${s.weight_importance} * (${articleAnalysisWithFeed.importance}::real / 100)
-    + ${s.weight_freshness} * ${freshness}
-    + ${s.weight_authority} * ${articleAnalysisWithFeed.feedAuthorityScore}
-    + ${s.weight_uniqueness} * 1.0
+    ${s.weight_relevance}::real * (${articleAnalysisWithFeed.relevance}::real / 100)
+    + ${s.weight_importance}::real * (${articleAnalysisWithFeed.importance}::real / 100)
+    + ${s.weight_freshness}::real * ${freshness}
+    + ${s.weight_authority}::real * ${articleAnalysisWithFeed.feedAuthorityScore}
+    + ${s.weight_uniqueness}::real * 1.0
   `;
 }
 
@@ -75,13 +77,13 @@ function toResponse(r: RankedRow) {
   return {
     id: r.id,
     articleId: r.articleId,
-    relevance: r.relevance,
-    importance: r.importance,
+    relevance: Number(r.relevance),
+    importance: Number(r.importance),
     tags: r.tags,
     llmSummary: r.llmSummary,
     analyzedAt: r.analyzedAt,
-    freshness: r.freshness,
-    compositeScore: r.compositeScore,
+    freshness: Number(r.freshness),
+    compositeScore: Number(r.compositeScore),
     article: {
       title: r.articleTitle,
       link: r.articleLink,
@@ -89,7 +91,7 @@ function toResponse(r: RankedRow) {
       author: r.articleAuthor,
       publishedAt: r.articlePublishedAt,
       feedName: r.feedName,
-      feedAuthorityScore: r.feedAuthorityScore,
+      feedAuthorityScore: Number(r.feedAuthorityScore),
     },
   };
 }

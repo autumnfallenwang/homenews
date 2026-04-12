@@ -50,25 +50,37 @@ See [composite-scoring-memo.md](composite-scoring-memo.md) for full design and a
 | 22 | LLM registry: `analyze` task | Done | New `analyze` + `summarize` tasks, `getSystemPrompt()` with `{{ALLOWED_TAGS}}` templating, model settings keys, legacy tasks kept until Task 23 |
 | 23 | Analyze + summarize pipeline | Done | New `analyze.ts` (relevance + importance + controlled tags), `summarize.ts`, scheduler reads enable toggles + batch sizes from settings, legacy `scoring`/`summarization`/`clustering` tasks dropped |
 | 24 | Ranked API with composite score | Done | SQL compute via `article_analysis_with_feed` view + settings, freshness decay, COALESCE for missing dates, sorted by composite |
-| 25 | Manual pipeline trigger API | Not started | `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints |
-| 26 | Settings page (web) | Not started | `/settings` route with weights, λ, tags, scheduler, pipeline control buttons, minScore |
-| 27 | Dashboard upgrade | Not started | Tag multi-select filter, weight sliders, multi-view sort |
-| 28 | Feed management upgrade | Not started | Authority score column in feeds table UI |
+| 25 | Manual pipeline trigger API | Done | `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints with settings-driven batch sizes and `?limit=` override |
+| 26 | Settings page (web) | Done | `/settings` route with scoring weights, λ, scheduler config, LLM models, tag vocabulary, pipeline control buttons |
+| 27 | Dashboard upgrade | Done | Tag multi-select filter with counts, multi-view sort (composite/relevance/importance/freshness), composite score badge |
+| 28 | Feed management upgrade | Done | Authority score column in feeds table with inline editable input |
 
-## Phase 6: iOS App
+## Phase 6: iOS App (SKIPPED — deferred indefinitely)
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 29 | iOS project setup | Not started | Swift package, API client |
-| 30 | Feed reader view | Not started | Ranked articles list |
-| 31 | Push notifications | Not started | High-score article alerts |
+| 29 | iOS project setup | Skipped | Swift package, API client |
+| 30 | Feed reader view | Skipped | Ranked articles list |
+| 31 | Push notifications | Skipped | High-score article alerts |
+
+## Phase 7: UI Redesign + Settings Consolidation
+
+See [ui-design-memo.md](ui-design-memo.md) for the design rationale, aesthetic direction (newsroom workstation), and architectural decisions.
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 32 | Foundation: theme tokens + fonts + nav | Partial | globals.css warm-dark/amber, layout.tsx with Fraunces + Geist Mono + dark default + restyled nav (done); pipeline-control.tsx component scaffolded |
+| 33 | Dashboard with pipeline control | Not started | Wire `<PipelineControl>` into `/`, restyle stats + article cards, restyle article detail page |
+| 34 | Tabbed settings layout | Not started | Sidebar nav, per-tab Save/Cancel, dirty tracking, unsaved-changes Dialog, all 5 existing sections |
+| 35 | Theme setting | Not started | `theme` setting (light/dark/system), ThemeApplier client component, Theme tab, cookie hydration |
+| 36 | Feeds in settings | Not started | Move FeedList to Feeds tab, drop top-nav link, redirect `/feeds → /settings?tab=feeds` |
 
 ## What's Working
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
 - Monorepo: Turborepo + pnpm workspace with 3 packages (api, web, shared)
-- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (composite-scored list/filter/paginate, detail, includes freshness + feedAuthorityScore) + settings API (GET list, GET/PATCH by key, reset)
-- Web: Next.js App Router on port 3000 with Tailwind CSS v4 + shadcn/ui components + dashboard (with cluster/search/source filters) + feed management page + article detail view
+- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (composite-scored list/filter/paginate, detail, includes freshness + feedAuthorityScore) + settings API (GET list, GET/PATCH by key, reset) + admin pipeline triggers (`POST /admin/pipeline/{fetch,analyze,summarize,run-all}`)
+- Web: Next.js App Router on port 3000 with Tailwind CSS v4 + shadcn/ui components + dashboard (composite-scored with multi-view sort, search, source filter, tag multi-select) + feed management page (inline-editable authority score) + article detail view + settings page (weights, λ, scheduler, LLM models, tag vocabulary, pipeline control buttons)
 - Shared: Zod schemas for Feed (with authorityScore), Article, ArticleAnalysis (relevance + importance), AnalyzedArticle, CreateFeed, UpdateFeed, Setting, UpdateSetting + DEFAULT_SETTINGS + ALLOWED_TAGS vocabulary (~39 tags)
 - Database: Drizzle ORM schema (feeds + authority_score, articles, article_analysis, settings with nullable user_id), article_analysis_with_feed view, seed scripts for feeds + settings
 - RSS Fetcher: rss-parser integration with pure mapping layer, fetchFeed/fetchAllFeeds services, duplicate handling via onConflictDoNothing
@@ -83,12 +95,12 @@ See [composite-scoring-memo.md](composite-scoring-memo.md) for full design and a
 - Settings: Central DB-backed key/value store (settings table) with service (getSetting, setSetting, seedDefaults), CRUD API, forward-compat for multi-user via nullable user_id, auto-seed on server startup. Holds weights, λ, tag vocab, scheduler config, per-task LLM model selection (primary + fallback)
 - LLM model selection: `getModelForTask()`/`getFallbackModelForTask()` read from settings at call time — hot-swap without restart
 - LLM prompt templating: `getSystemPrompt()` resolves `{{ALLOWED_TAGS}}` placeholder from settings for `analyze` task; static prompts returned as-is for other tasks
-- Tooling: Biome lint, Vitest (125 tests passing), TypeScript strict mode
+- Tooling: Biome lint, Vitest (131 tests passing), TypeScript strict mode
 - DB scripts: Docker-based PostgreSQL start/stop/reset
 
 ## What's Next
 
-Task 25: Manual pipeline trigger API (POST /admin/pipeline/{fetch,analyze,summarize,run-all}).
+Phase 6 iOS skipped — Task 32: Foundation theme/fonts/nav (Phase 7 UI redesign begins, partially landed in current session).
 
 ## Reference Docs
 

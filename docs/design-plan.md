@@ -88,12 +88,21 @@ See [composite-scoring-memo.md](composite-scoring-memo.md) for full design.
 27. Dashboard upgrade — tag filter (multi-select), weight sliders, multi-view sort (relevance/importance/freshness/composite)
 28. Feed management upgrade — authority score column in feeds table UI
 
-### Phase 6 — iOS App
-29. iOS project setup
-30. Feed reader view
-31. Push notifications for high-score articles
+### Phase 6 — iOS App (SKIPPED — deferred indefinitely)
+29. iOS project setup *(skipped)*
+30. Feed reader view *(skipped)*
+31. Push notifications for high-score articles *(skipped)*
 
-### Phase 7 — Future Enhancements (deferred)
+### Phase 7 — UI Redesign + Settings Consolidation
+See [ui-design-memo.md](ui-design-memo.md) for full design rationale and decisions.
+
+32. Foundation: theme tokens + fonts + top nav — warm dark + amber palette, Fraunces display, Geist Mono for data, restyled nav
+33. Dashboard with pipeline control — `<PipelineControl>` strip at top of `/`, restyled stats + article cards, article detail consistency
+34. Tabbed settings layout — sidebar nav, per-tab Save/Cancel, dirty tracking, unsaved-changes Dialog, sections for Scoring/Freshness/Scheduler/LLM Models/Tag Vocabulary
+35. Theme setting — `theme` setting key (light/dark/system), ThemeApplier client component, Theme tab in settings, cookie hydration
+36. Feeds in settings — move `<FeedList>` to a Feeds tab, drop top-nav Feeds link, redirect `/feeds → /settings?tab=feeds`
+
+### Phase 8 — Future Enhancements (deferred)
 - Full article fetching for thin feeds
 - Custom topic profiles
 - Trend detection over time

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import adminApp from "./routes/admin.js";
 import feedsApp from "./routes/feeds.js";
 import rankedApp from "./routes/ranked.js";
 import settingsApp from "./routes/settings.js";
@@ -20,5 +21,6 @@ app.get("/health", (c) => {
 app.route("/feeds", feedsApp);
 app.route("/ranked", rankedApp);
 app.route("/settings", settingsApp);
+app.route("/admin", adminApp);
 
 export default app;

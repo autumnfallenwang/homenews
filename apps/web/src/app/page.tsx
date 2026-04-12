@@ -17,10 +17,12 @@ export default async function Home() {
     // API unavailable — show empty state
   }
 
-  const avgScore =
+  const avgCompositeRaw =
     articles.length > 0
-      ? Math.round(articles.reduce((sum, a) => sum + a.relevance, 0) / articles.length)
+      ? (articles.reduce((sum, a) => sum + Number(a.compositeScore || 0), 0) / articles.length) *
+        100
       : 0;
+  const avgComposite = Number.isFinite(avgCompositeRaw) ? Math.round(avgCompositeRaw) : 0;
 
   const sourceCount = new Set(articles.map((a) => a.article.feedName)).size;
 
@@ -54,8 +56,8 @@ export default async function Home() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{avgScore}</div>
-            <p className="text-xs text-muted-foreground">relevance score</p>
+            <div className="text-2xl font-bold">{avgComposite}</div>
+            <p className="text-xs text-muted-foreground">composite score (0-100)</p>
           </CardContent>
         </Card>
         <Card>

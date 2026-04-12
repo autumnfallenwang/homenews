@@ -56,6 +56,18 @@ export function FeedList({ initialFeeds }: { initialFeeds: Feed[] }) {
     }
   }
 
+  async function handleAuthorityChange(feed: Feed, value: number) {
+    setBusy(feed.id);
+    try {
+      const updated = await updateFeed(feed.id, { authorityScore: value });
+      setFeeds((prev) => prev.map((f) => (f.id === feed.id ? updated : f)));
+    } catch (err) {
+      console.error("Update authority failed:", err);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleDelete(feed: Feed) {
     if (!window.confirm(`Delete "${feed.name}" and all its articles?`)) return;
     setBusy(feed.id);
@@ -170,6 +182,7 @@ export function FeedList({ initialFeeds }: { initialFeeds: Feed[] }) {
               <TableHead>Name</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Enabled</TableHead>
+              <TableHead title="Per-feed weight in the composite score (0-1)">Authority</TableHead>
               <TableHead>Last Fetched</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -191,6 +204,13 @@ export function FeedList({ initialFeeds }: { initialFeeds: Feed[] }) {
                     checked={feed.enabled}
                     onCheckedChange={() => handleToggle(feed)}
                     disabled={busy === feed.id}
+                  />
+                </TableCell>
+                <TableCell>
+                  <AuthorityInput
+                    feed={feed}
+                    onSave={handleAuthorityChange}
+                    busy={busy === feed.id}
                   />
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
@@ -224,5 +244,44 @@ export function FeedList({ initialFeeds }: { initialFeeds: Feed[] }) {
         </Table>
       )}
     </div>
+  );
+}
+
+function AuthorityInput({
+  feed,
+  onSave,
+  busy,
+}: {
+  feed: Feed;
+  onSave: (feed: Feed, value: number) => Promise<void>;
+  busy: boolean;
+}) {
+  const current = String(feed.authorityScore);
+  const [local, setLocal] = useState(current);
+  if (local !== current && !busy) {
+    setLocal(current);
+  }
+
+  async function commit() {
+    const num = Number.parseFloat(local);
+    if (Number.isFinite(num) && num >= 0 && num <= 1 && num !== feed.authorityScore) {
+      await onSave(feed, num);
+    } else if (!Number.isFinite(num) || num < 0 || num > 1) {
+      setLocal(current);
+    }
+  }
+
+  return (
+    <Input
+      type="number"
+      min={0}
+      max={1}
+      step={0.05}
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={commit}
+      disabled={busy}
+      className="h-8 w-20"
+    />
   );
 }
