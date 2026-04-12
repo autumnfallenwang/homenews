@@ -38,19 +38,21 @@ async function loadCompositeSettings(): Promise<CompositeSettings> {
 
 function buildFreshnessExpr(lambda: number) {
   // Cast lambda param to real so PG can resolve the unary minus operator.
-  return sql<number>`EXP(-(${lambda}::real) * EXTRACT(EPOCH FROM (NOW() - COALESCE(${articleAnalysisWithFeed.articlePublishedAt}, ${articleAnalysisWithFeed.articleFetchedAt}))) / 3600.0)`;
+  // Clamp the exponent to avoid PG float underflow on very old articles
+  // (EXP raises 22003 instead of returning 0 for results below ~1e-308).
+  return sql<number>`EXP(-LEAST((${lambda}::double precision) * EXTRACT(EPOCH FROM (NOW() - COALESCE(${articleAnalysisWithFeed.articlePublishedAt}, ${articleAnalysisWithFeed.articleFetchedAt}))) / 3600.0, 700))`;
 }
 
 function buildCompositeExpr(s: CompositeSettings) {
   const freshness = buildFreshnessExpr(s.freshness_lambda);
-  // All weight params cast to ::real so PG can pick the right multiplication operator.
+  // All weight params cast to ::double precision so PG can pick the right multiplication operator.
   // Uniqueness is hardcoded to 1.0 for now — real uniqueness signal deferred.
   return sql<number>`
-    ${s.weight_relevance}::real * (${articleAnalysisWithFeed.relevance}::real / 100)
-    + ${s.weight_importance}::real * (${articleAnalysisWithFeed.importance}::real / 100)
-    + ${s.weight_freshness}::real * ${freshness}
-    + ${s.weight_authority}::real * ${articleAnalysisWithFeed.feedAuthorityScore}
-    + ${s.weight_uniqueness}::real * 1.0
+    ${s.weight_relevance}::double precision * (${articleAnalysisWithFeed.relevance}::double precision / 100)
+    + ${s.weight_importance}::double precision * (${articleAnalysisWithFeed.importance}::double precision / 100)
+    + ${s.weight_freshness}::double precision * ${freshness}
+    + ${s.weight_authority}::double precision * ${articleAnalysisWithFeed.feedAuthorityScore}
+    + ${s.weight_uniqueness}::double precision * 1.0
   `;
 }
 

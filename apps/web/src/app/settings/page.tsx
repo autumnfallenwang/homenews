@@ -2,7 +2,12 @@ import type { Setting } from "@homenews/shared";
 import { fetchSettings } from "@/lib/api";
 import { SettingsForm } from "./settings-form";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
   let settings: Setting[] = [];
   try {
     settings = await fetchSettings();
@@ -11,8 +16,8 @@ export default async function SettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-8">
-      <SettingsForm initialSettings={settings} />
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <SettingsForm initialSettings={settings} initialTab={tab ?? "scoring"} />
     </main>
   );
 }

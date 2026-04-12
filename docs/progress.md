@@ -63,24 +63,24 @@ See [composite-scoring-memo.md](composite-scoring-memo.md) for full design and a
 | 30 | Feed reader view | Skipped | Ranked articles list |
 | 31 | Push notifications | Skipped | High-score article alerts |
 
-## Phase 7: UI Redesign + Settings Consolidation
+## Phase 7: UI Redesign + Settings Consolidation (COMPLETE)
 
 See [ui-design-memo.md](ui-design-memo.md) for the design rationale, aesthetic direction (newsroom workstation), and architectural decisions.
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 32 | Foundation: theme tokens + fonts + nav | Partial | globals.css warm-dark/amber, layout.tsx with Fraunces + Geist Mono + dark default + restyled nav (done); pipeline-control.tsx component scaffolded |
-| 33 | Dashboard with pipeline control | Not started | Wire `<PipelineControl>` into `/`, restyle stats + article cards, restyle article detail page |
-| 34 | Tabbed settings layout | Not started | Sidebar nav, per-tab Save/Cancel, dirty tracking, unsaved-changes Dialog, all 5 existing sections |
-| 35 | Theme setting | Not started | `theme` setting (light/dark/system), ThemeApplier client component, Theme tab, cookie hydration |
-| 36 | Feeds in settings | Not started | Move FeedList to Feeds tab, drop top-nav link, redirect `/feeds → /settings?tab=feeds` |
+| 32 | Foundation: theme tokens + fonts + nav | Done | Warm-dark/amber palette in globals.css, Fraunces display + Geist Mono via next/font, forced dark mode, restyled top nav with mono uppercase links + Fraunces wordmark + system status dot. PipelineControl component scaffolded for Task 33 |
+| 33 | Dashboard with pipeline control | Done | PipelineControl wired into `/`, restyled page header with Fraunces title + mono metric strip, hairline-divided article rows, restyled filter controls, restyled article detail page, removed pipeline buttons from settings |
+| 34 | Tabbed settings layout | Done | Sidebar nav with mono numeric prefixes + dirty dots, 5 sections (Scoring/Freshness/Scheduler/Models/Tags), per-tab dirty tracking, sticky SaveBar, unsaved-changes Dialog, URL state via `?tab=`, immediate save for tags |
+| 35 | Theme setting | Done | `theme` setting key (light/dark/system) in DB, ThemeApplier client component with system-mode media query listener, cookie hydration via SSR layout, Theme tab in settings sidebar with 3-option grid |
+| 36 | Feeds in settings | Done | FeedList moved into `07 FEEDS` tab via `FeedsSection` wrapper, top-nav Feeds link dropped, `/feeds` redirects to `/settings?tab=feeds` |
 
 ## What's Working
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
 - Monorepo: Turborepo + pnpm workspace with 3 packages (api, web, shared)
 - API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (composite-scored list/filter/paginate, detail, includes freshness + feedAuthorityScore) + settings API (GET list, GET/PATCH by key, reset) + admin pipeline triggers (`POST /admin/pipeline/{fetch,analyze,summarize,run-all}`)
-- Web: Next.js App Router on port 3000 with Tailwind CSS v4 + shadcn/ui components + dashboard (composite-scored with multi-view sort, search, source filter, tag multi-select) + feed management page (inline-editable authority score) + article detail view + settings page (weights, λ, scheduler, LLM models, tag vocabulary, pipeline control buttons)
+- Web: Next.js App Router on port 3000 with Tailwind CSS v4 + shadcn/ui components, newsroom-workstation theme (warm dark + amber, Fraunces display, Geist Mono for data, light/dark/system theme switcher) + dashboard (PipelineControl strip at top, Fraunces page header, mono metric strip, hairline-divided article rows, segmented sort + chip filters) + article detail view (newspaper-style with score grid + amber-bordered AI summary) + tabbed settings page (sidebar nav with dirty indicators, per-tab Save/Cancel, unsaved-changes Dialog, URL deep-linking via ?tab=, sections for Scoring/Freshness/Scheduler/LLM Models/Tag Vocabulary/Theme/Feeds — `/feeds` redirects to `/settings?tab=feeds`)
 - Shared: Zod schemas for Feed (with authorityScore), Article, ArticleAnalysis (relevance + importance), AnalyzedArticle, CreateFeed, UpdateFeed, Setting, UpdateSetting + DEFAULT_SETTINGS + ALLOWED_TAGS vocabulary (~39 tags)
 - Database: Drizzle ORM schema (feeds + authority_score, articles, article_analysis, settings with nullable user_id), article_analysis_with_feed view, seed scripts for feeds + settings
 - RSS Fetcher: rss-parser integration with pure mapping layer, fetchFeed/fetchAllFeeds services, duplicate handling via onConflictDoNothing
@@ -100,7 +100,7 @@ See [ui-design-memo.md](ui-design-memo.md) for the design rationale, aesthetic d
 
 ## What's Next
 
-Phase 6 iOS skipped — Task 32: Foundation theme/fonts/nav (Phase 7 UI redesign begins, partially landed in current session).
+Phase 7 complete. Next direction TBD — pick up new initiative or polish.
 
 ## Reference Docs
 

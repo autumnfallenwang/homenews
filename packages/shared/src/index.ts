@@ -273,6 +273,13 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
     type: "string",
     description: "Fallback LLM model for summarize task if primary fails",
   },
+
+  // UI theme
+  theme: {
+    value: "dark",
+    type: "string",
+    description: "UI theme: light, dark, or system (follows OS preference)",
+  },
 };
 
 export type SettingKey = keyof typeof DEFAULT_SETTINGS;

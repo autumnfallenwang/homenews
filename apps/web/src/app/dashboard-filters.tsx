@@ -4,11 +4,8 @@ import type { AnalyzedArticle } from "@homenews/shared";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 type SortKey = "composite" | "relevance" | "importance" | "freshness";
 
@@ -30,46 +27,65 @@ function formatRelativeTime(dateStr: string | null): string {
   return `${days}d ago`;
 }
 
-function scoreVariant(score: number) {
-  if (score >= 80) return "default" as const;
-  if (score >= 60) return "secondary" as const;
-  return "outline" as const;
+function scoreColor(score: number): string {
+  if (score >= 80) return "text-primary";
+  if (score >= 60) return "text-foreground";
+  return "text-muted-foreground";
 }
 
-function ArticleCard({ item }: { item: AnalyzedArticle }) {
-  const compositeDisplay = Math.round(Number(item.compositeScore) * 100);
+function ArticleRow({ item }: { item: AnalyzedArticle }) {
+  const composite = Math.round(Number(item.compositeScore) * 100);
   return (
-    <Card className="transition-colors hover:bg-accent/50">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <CardTitle className="text-base leading-snug">
-              <Link href={`/article/${item.id}`} className="hover:underline">
-                {item.article.title}
-              </Link>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              {item.article.feedName} &middot; {formatRelativeTime(item.article.publishedAt)}
-            </CardDescription>
+    <article className="group relative border-b border-border py-6 transition-colors hover:bg-card/30">
+      <div className="px-1">
+        {/* Top meta row */}
+        <div className="mb-2 flex items-center justify-between gap-4">
+          <div className="flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            <span className="text-foreground/80">{item.article.feedName}</span>
+            <span className="text-muted-foreground/50">·</span>
+            <span>{formatRelativeTime(item.article.publishedAt)}</span>
           </div>
-          <Badge variant={scoreVariant(compositeDisplay)} title="Composite score">
-            {compositeDisplay}
-          </Badge>
+          <div className="flex items-baseline gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/60">
+              score
+            </span>
+            <span
+              className={cn("tabular font-mono text-[15px] font-medium", scoreColor(composite))}
+            >
+              {composite}
+            </span>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <p className="text-sm text-muted-foreground mb-3">
-          {item.llmSummary ?? item.article.summary ?? "No summary available."}
-        </p>
-        <div className="flex items-center gap-2 flex-wrap">
-          {item.tags?.map((tag) => (
-            <Badge key={tag} variant="secondary" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+
+        {/* Title */}
+        <h3 className="font-display text-[22px] font-medium leading-[1.2] tracking-tight text-foreground transition-colors group-hover:text-primary">
+          <Link href={`/article/${item.id}`} className="block">
+            {item.article.title}
+          </Link>
+        </h3>
+
+        {/* Summary */}
+        {(item.llmSummary || item.article.summary) && (
+          <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-muted-foreground">
+            {item.llmSummary ?? item.article.summary}
+          </p>
+        )}
+
+        {/* Tags */}
+        {item.tags && item.tags.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {item.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-sm border border-border bg-card/40 px-1.5 py-0.5 font-mono text-[10px] lowercase tracking-wide text-muted-foreground"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -139,96 +155,143 @@ export function DashboardFilters({ articles }: { articles: AnalyzedArticle[] }) 
   }, [filtered, sortKey]);
 
   return (
-    <>
-      {/* Search + Source + Sort */}
-      <div className="flex gap-3 mb-4 flex-wrap items-center">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search articles..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9 h-9"
-          />
+    <section>
+      {/* Filter controls */}
+      <div className="mb-6 space-y-3">
+        {/* Search + Sort */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search articles..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-9 pl-8 font-mono text-[12px]"
+            />
+          </div>
+          <SegmentedSort sortKey={sortKey} onChange={setSortKey} />
         </div>
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-xs text-muted-foreground mr-1">Sort:</span>
-          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-            <Button
-              key={k}
-              variant={sortKey === k ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setSortKey(k)}
-            >
-              {SORT_LABELS[k]}
-            </Button>
-          ))}
-        </div>
+
+        {/* Source filter */}
+        {sources.length > 1 && (
+          <FilterRow label="Source">
+            <ChipButton active={activeSource === null} onClick={() => setActiveSource(null)}>
+              All
+            </ChipButton>
+            {sources.map((s) => (
+              <ChipButton
+                key={s}
+                active={activeSource === s}
+                onClick={() => setActiveSource(activeSource === s ? null : s)}
+              >
+                {s}
+              </ChipButton>
+            ))}
+          </FilterRow>
+        )}
+
+        {/* Tag filter */}
+        {sortedTags.length > 0 && (
+          <FilterRow label="Tags">
+            <ChipButton active={selectedTags.size === 0} onClick={() => setSelectedTags(new Set())}>
+              All
+            </ChipButton>
+            {sortedTags.slice(0, 24).map(([tag, count]) => (
+              <ChipButton key={tag} active={selectedTags.has(tag)} onClick={() => toggleTag(tag)}>
+                {tag}
+                <span className="ml-1.5 text-muted-foreground/60">{count}</span>
+              </ChipButton>
+            ))}
+          </FilterRow>
+        )}
       </div>
-
-      {/* Source filter */}
-      {sources.length > 1 && (
-        <div className="flex items-center gap-1 flex-wrap mb-3">
-          <span className="text-xs text-muted-foreground mr-1">Source:</span>
-          <Button
-            variant={activeSource === null ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveSource(null)}
-          >
-            All sources
-          </Button>
-          {sources.map((s) => (
-            <Button
-              key={s}
-              variant={activeSource === s ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setActiveSource(activeSource === s ? null : s)}
-            >
-              {s}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      {/* Tag filter */}
-      {sortedTags.length > 0 && (
-        <div className="flex items-center gap-1 flex-wrap mb-4">
-          <span className="text-xs text-muted-foreground mr-1">Tags:</span>
-          <Button
-            variant={selectedTags.size === 0 ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setSelectedTags(new Set())}
-          >
-            All tags
-          </Button>
-          {sortedTags.slice(0, 20).map(([tag, count]) => (
-            <Button
-              key={tag}
-              variant={selectedTags.has(tag) ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => toggleTag(tag)}
-            >
-              {tag}
-              <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
-                {count}
-              </Badge>
-            </Button>
-          ))}
-        </div>
-      )}
-
-      <Separator className="mb-6" />
 
       {/* Filtered + sorted article list */}
       {sorted.length === 0 ? (
-        <p className="text-muted-foreground text-center py-8">No articles match your filters.</p>
+        <EmptyState />
       ) : (
-        <div className="space-y-4">
+        <div className="border-t border-border">
           {sorted.map((item) => (
-            <ArticleCard key={item.id} item={item} />
+            <ArticleRow key={item.id} item={item} />
           ))}
         </div>
       )}
-    </>
+    </section>
+  );
+}
+
+function SegmentedSort({
+  sortKey,
+  onChange,
+}: {
+  sortKey: SortKey;
+  onChange: (k: SortKey) => void;
+}) {
+  return (
+    <div className="flex items-stretch overflow-hidden rounded-sm border border-border bg-card/40">
+      {(Object.keys(SORT_LABELS) as SortKey[]).map((k, i) => (
+        <div key={k} className="flex items-stretch">
+          {i > 0 && <span className="w-px bg-border" aria-hidden />}
+          <button
+            type="button"
+            onClick={() => onChange(k)}
+            className={cn(
+              "px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors",
+              sortKey === k
+                ? "bg-background text-primary"
+                : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
+            )}
+          >
+            {SORT_LABELS[k]}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground/70">
+        {label}
+      </span>
+      <div className="flex flex-wrap items-center gap-1">{children}</div>
+    </div>
+  );
+}
+
+function ChipButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-sm border px-2 py-0.5 font-mono text-[10px] lowercase tracking-wide transition-colors",
+        active
+          ? "border-primary/50 bg-primary/10 text-primary"
+          : "border-border bg-card/30 text-muted-foreground hover:border-border hover:bg-card/60 hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="border-y border-border py-16 text-center">
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+        No articles match your filters
+      </p>
+    </div>
   );
 }
