@@ -1,7 +1,7 @@
-import { count, desc, eq, gte, sql } from "drizzle-orm";
+import { desc, eq, gte } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/index.js";
-import { articles, feeds, ranked } from "../db/schema.js";
+import { articleAnalysis, articles, feeds } from "../db/schema.js";
 
 const app = new Hono();
 
@@ -10,17 +10,16 @@ app.get("/", async (c) => {
   const limit = Math.min(Number(c.req.query("limit") ?? 20), 100);
   const offset = Number(c.req.query("offset") ?? 0);
   const minScore = Number(c.req.query("minScore") ?? 0);
-  const cluster = c.req.query("cluster");
 
-  let query = db
+  const rows = await db
     .select({
-      id: ranked.id,
-      articleId: ranked.articleId,
-      score: ranked.score,
-      tags: ranked.tags,
-      cluster: ranked.cluster,
-      llmSummary: ranked.llmSummary,
-      rankedAt: ranked.rankedAt,
+      id: articleAnalysis.id,
+      articleId: articleAnalysis.articleId,
+      relevance: articleAnalysis.relevance,
+      importance: articleAnalysis.importance,
+      tags: articleAnalysis.tags,
+      llmSummary: articleAnalysis.llmSummary,
+      analyzedAt: articleAnalysis.analyzedAt,
       articleTitle: articles.title,
       articleLink: articles.link,
       articleSummary: articles.summary,
@@ -28,29 +27,22 @@ app.get("/", async (c) => {
       articlePublishedAt: articles.publishedAt,
       feedName: feeds.name,
     })
-    .from(ranked)
-    .innerJoin(articles, eq(ranked.articleId, articles.id))
+    .from(articleAnalysis)
+    .innerJoin(articles, eq(articleAnalysis.articleId, articles.id))
     .innerJoin(feeds, eq(articles.feedId, feeds.id))
-    .where(gte(ranked.score, minScore))
-    .orderBy(desc(ranked.score), desc(ranked.rankedAt))
+    .where(gte(articleAnalysis.relevance, minScore))
+    .orderBy(desc(articleAnalysis.relevance), desc(articleAnalysis.analyzedAt))
     .limit(limit)
-    .offset(offset)
-    .$dynamic();
-
-  if (cluster) {
-    query = query.where(eq(ranked.cluster, cluster));
-  }
-
-  const rows = await query;
+    .offset(offset);
 
   const results = rows.map((r) => ({
     id: r.id,
     articleId: r.articleId,
-    score: r.score,
+    relevance: r.relevance,
+    importance: r.importance,
     tags: r.tags,
-    cluster: r.cluster,
     llmSummary: r.llmSummary,
-    rankedAt: r.rankedAt,
+    analyzedAt: r.analyzedAt,
     article: {
       title: r.articleTitle,
       link: r.articleLink,
@@ -64,34 +56,19 @@ app.get("/", async (c) => {
   return c.json(results);
 });
 
-// List distinct clusters with counts
-app.get("/clusters", async (c) => {
-  const rows = await db
-    .select({
-      cluster: ranked.cluster,
-      count: count(),
-    })
-    .from(ranked)
-    .where(sql`${ranked.cluster} IS NOT NULL`)
-    .groupBy(ranked.cluster)
-    .orderBy(desc(count()));
-
-  return c.json(rows);
-});
-
 // Get single ranked article
 app.get("/:id", async (c) => {
   const id = c.req.param("id");
 
   const [row] = await db
     .select({
-      id: ranked.id,
-      articleId: ranked.articleId,
-      score: ranked.score,
-      tags: ranked.tags,
-      cluster: ranked.cluster,
-      llmSummary: ranked.llmSummary,
-      rankedAt: ranked.rankedAt,
+      id: articleAnalysis.id,
+      articleId: articleAnalysis.articleId,
+      relevance: articleAnalysis.relevance,
+      importance: articleAnalysis.importance,
+      tags: articleAnalysis.tags,
+      llmSummary: articleAnalysis.llmSummary,
+      analyzedAt: articleAnalysis.analyzedAt,
       articleTitle: articles.title,
       articleLink: articles.link,
       articleSummary: articles.summary,
@@ -99,21 +76,21 @@ app.get("/:id", async (c) => {
       articlePublishedAt: articles.publishedAt,
       feedName: feeds.name,
     })
-    .from(ranked)
-    .innerJoin(articles, eq(ranked.articleId, articles.id))
+    .from(articleAnalysis)
+    .innerJoin(articles, eq(articleAnalysis.articleId, articles.id))
     .innerJoin(feeds, eq(articles.feedId, feeds.id))
-    .where(eq(ranked.id, id));
+    .where(eq(articleAnalysis.id, id));
 
-  if (!row) return c.json({ error: "Ranked article not found" }, 404);
+  if (!row) return c.json({ error: "Article analysis not found" }, 404);
 
   return c.json({
     id: row.id,
     articleId: row.articleId,
-    score: row.score,
+    relevance: row.relevance,
+    importance: row.importance,
     tags: row.tags,
-    cluster: row.cluster,
     llmSummary: row.llmSummary,
-    rankedAt: row.rankedAt,
+    analyzedAt: row.analyzedAt,
     article: {
       title: row.articleTitle,
       link: row.articleLink,

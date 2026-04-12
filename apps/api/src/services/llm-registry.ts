@@ -1,15 +1,10 @@
-const DEFAULT_MODEL = "claude-haiku-4-5";
+import { getSetting } from "./settings.js";
 
 export interface LlmTaskConfig {
   name: string;
   description: string;
   systemPrompt: string;
   outputFormat: "json" | "text";
-  model: string;
-}
-
-function resolveModel(envKey: string): string {
-  return process.env[envKey] ?? process.env.LLM_MODEL ?? DEFAULT_MODEL;
 }
 
 export const llmTasks: Record<string, LlmTaskConfig> = {
@@ -21,7 +16,6 @@ Rate each article's relevance to AI, machine learning, and technology on a scale
 Respond ONLY with valid JSON in this exact format:
 {"score": <number 0-100>, "tags": [<string tags>], "reasoning": "<brief explanation>"}`,
     outputFormat: "json",
-    model: resolveModel("LLM_MODEL_SCORING"),
   },
   clustering: {
     name: "clustering",
@@ -33,7 +27,6 @@ Respond ONLY with valid JSON in this exact format:
 {"clusters": {"article_id": "Cluster Label", "article_id2": "Cluster Label", ...}}
 Every article must be assigned to exactly one cluster. Articles that don't fit any group get their own unique cluster label.`,
     outputFormat: "json",
-    model: resolveModel("LLM_MODEL_CLUSTERING"),
   },
   summarization: {
     name: "summarization",
@@ -42,7 +35,6 @@ Every article must be assigned to exactly one cluster. Articles that don't fit a
 Write a concise 2-3 sentence summary of the article that captures the key points.
 Respond ONLY with the summary text, no preamble or formatting.`,
     outputFormat: "text",
-    model: resolveModel("LLM_MODEL_SUMMARIZATION"),
   },
 };
 
@@ -50,4 +42,24 @@ export type LlmTaskName = keyof typeof llmTasks;
 
 export function getTaskConfig(task: LlmTaskName): LlmTaskConfig {
   return llmTasks[task];
+}
+
+/**
+ * Get the primary model for a task from the settings table.
+ * Key format: `llm_model_<task>` (e.g. `llm_model_scoring`).
+ */
+export function getModelForTask(task: LlmTaskName): Promise<string> {
+  return getSetting<string>(`llm_model_${task}`);
+}
+
+/**
+ * Get the fallback model for a task from the settings table.
+ * Returns null if no fallback is configured.
+ */
+export async function getFallbackModelForTask(task: LlmTaskName): Promise<string | null> {
+  try {
+    return await getSetting<string>(`llm_model_${task}_fallback`);
+  } catch {
+    return null;
+  }
 }

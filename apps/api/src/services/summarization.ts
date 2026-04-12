@@ -1,6 +1,6 @@
 import { eq, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { articles, ranked } from "../db/schema.js";
+import { articleAnalysis, articles } from "../db/schema.js";
 import { llmExecute } from "./llm-executor.js";
 
 export function buildSummaryPrompt(
@@ -42,14 +42,14 @@ export async function summarizeUnsummarized(): Promise<{
 }> {
   const unsummarized = await db
     .select({
-      rankedId: ranked.id,
+      analysisId: articleAnalysis.id,
       title: articles.title,
       summary: articles.summary,
       content: articles.content,
     })
-    .from(ranked)
-    .innerJoin(articles, eq(ranked.articleId, articles.id))
-    .where(isNull(ranked.llmSummary));
+    .from(articleAnalysis)
+    .innerJoin(articles, eq(articleAnalysis.articleId, articles.id))
+    .where(isNull(articleAnalysis.llmSummary));
 
   let summarized = 0;
   let errors = 0;
@@ -57,7 +57,10 @@ export async function summarizeUnsummarized(): Promise<{
   for (const row of unsummarized) {
     try {
       const llmSummary = await summarizeArticle(row.title, row.summary, row.content);
-      await db.update(ranked).set({ llmSummary }).where(eq(ranked.id, row.rankedId));
+      await db
+        .update(articleAnalysis)
+        .set({ llmSummary })
+        .where(eq(articleAnalysis.id, row.analysisId));
       summarized++;
     } catch (err) {
       console.warn(

@@ -1,6 +1,6 @@
 import { and, eq, isNull, notExists } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { articles, ranked } from "../db/schema.js";
+import { articleAnalysis, articles } from "../db/schema.js";
 import { llmExecute } from "./llm-executor.js";
 
 export interface ScoreResult {
@@ -45,7 +45,10 @@ export async function scoreUnscored(): Promise<{ scored: number; errors: number 
       and(
         isNull(articles.duplicateOfId),
         notExists(
-          db.select({ one: ranked.id }).from(ranked).where(eq(ranked.articleId, articles.id)),
+          db
+            .select({ one: articleAnalysis.id })
+            .from(articleAnalysis)
+            .where(eq(articleAnalysis.articleId, articles.id)),
         ),
       ),
     );
@@ -56,9 +59,9 @@ export async function scoreUnscored(): Promise<{ scored: number; errors: number 
   for (const article of unscored) {
     try {
       const result = await scoreArticle(article.title, article.summary);
-      await db.insert(ranked).values({
+      await db.insert(articleAnalysis).values({
         articleId: article.id,
-        score: result.score,
+        relevance: result.score,
         tags: result.tags,
       });
       scored++;

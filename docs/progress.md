@@ -43,46 +43,49 @@ See [composite-scoring-memo.md](composite-scoring-memo.md) for full design and a
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 18 | Schema refactor | Not started | New `article_analysis` table, `feeds.authority_score`, view, drop old `ranked` |
-| 19 | Settings infrastructure | Not started | DB table (multi-user forward-compat), API, Zod schemas, seeds for weights/λ/tags/scheduler config |
-| 20 | LLM registry: `analyze` task | Not started | Prompt template with `{{ALLOWED_TAGS}}` from settings, drop old `scoring`/`clustering` |
-| 21 | Analyze + summarize pipeline | Not started | New `analyze.ts`, rename `summarization.ts` → `summarize.ts`, scheduler reads enable toggles + batch sizes from settings |
-| 22 | Ranked API with composite score | Not started | SQL compute via view + settings, COALESCE for missing dates |
-| 23 | Manual pipeline trigger API | Not started | `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints |
-| 24 | Settings page (web) | Not started | `/settings` route with weights, λ, tags, scheduler, pipeline control buttons, minScore |
-| 25 | Dashboard upgrade | Not started | Tag multi-select filter, weight sliders, multi-view sort |
-| 26 | Feed management upgrade | Not started | Authority score column in feeds table UI |
+| 18 | Schema refactor | Done | `article_analysis` table, `feeds.authority_score`, view, clustering removed, shared/web updated |
+| 19 | Settings infrastructure | Done | DB table (forward-compat nullable user_id), CRUD API, Zod schemas, DEFAULT_SETTINGS seed, auto-seed on startup |
+| 20 | Type rename cleanup | Done | `Ranked`/`RankedArticle` → `ArticleAnalysis`/`AnalyzedArticle` in shared + web consumers. URL `/ranked` kept |
+| 21 | Move LLM model selection to settings | Done | Per-task primary + fallback in settings, async `getModelForTask()`/`getFallbackModelForTask()`, executor hot-reads per call, removed model env vars |
+| 22 | LLM registry: `analyze` task | Not started | Prompt template with `{{ALLOWED_TAGS}}` from settings, drop old `scoring`/`clustering` |
+| 23 | Analyze + summarize pipeline | Not started | New `analyze.ts`, rename `summarization.ts` → `summarize.ts`, scheduler reads enable toggles + batch sizes from settings |
+| 24 | Ranked API with composite score | Not started | SQL compute via view + settings, COALESCE for missing dates |
+| 25 | Manual pipeline trigger API | Not started | `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints |
+| 26 | Settings page (web) | Not started | `/settings` route with weights, λ, tags, scheduler, pipeline control buttons, minScore |
+| 27 | Dashboard upgrade | Not started | Tag multi-select filter, weight sliders, multi-view sort |
+| 28 | Feed management upgrade | Not started | Authority score column in feeds table UI |
 
 ## Phase 6: iOS App
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 27 | iOS project setup | Not started | Swift package, API client |
-| 28 | Feed reader view | Not started | Ranked articles list |
-| 29 | Push notifications | Not started | High-score article alerts |
+| 29 | iOS project setup | Not started | Swift package, API client |
+| 30 | Feed reader view | Not started | Ranked articles list |
+| 31 | Push notifications | Not started | High-score article alerts |
 
 ## What's Working
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
 - Monorepo: Turborepo + pnpm workspace with 3 packages (api, web, shared)
-- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (list/filter/paginate, clusters, detail)
+- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (list/filter/paginate, detail) + settings API (GET list, GET/PATCH by key, reset)
 - Web: Next.js App Router on port 3000 with Tailwind CSS v4 + shadcn/ui components + dashboard (with cluster/search/source filters) + feed management page + article detail view
-- Shared: Zod schemas for Feed, Article, Ranked, RankedArticle, ClusterInfo, CreateFeed, UpdateFeed consumed by api and web
-- Database: Drizzle ORM schema (feeds, articles, ranked), postgres.js connection, drizzle-kit config, seed script with 9 AI/LLM feeds
+- Shared: Zod schemas for Feed (with authorityScore), Article, ArticleAnalysis (relevance + importance), AnalyzedArticle, CreateFeed, UpdateFeed, Setting, UpdateSetting + DEFAULT_SETTINGS + ALLOWED_TAGS vocabulary (~39 tags)
+- Database: Drizzle ORM schema (feeds + authority_score, articles, article_analysis, settings with nullable user_id), article_analysis_with_feed view, seed scripts for feeds + settings
 - RSS Fetcher: rss-parser integration with pure mapping layer, fetchFeed/fetchAllFeeds services, duplicate handling via onConflictDoNothing
 - Scheduler: node-cron job runs fetchAllFeeds every 30 min (configurable via FETCH_INTERVAL), noOverlap protection, start/stop exports
 - Deduplication: URL-level via unique constraint + title similarity via bigram Dice coefficient, runs inline during fetch, 48h window
 - LLM Registry: Central task config (llm-registry.ts) — prompts, output formats, per-task model selection via env vars
 - LLM Executor: Unified llmExecute() — auto JSON extraction, model fallback (LLM_FALLBACK_MODEL), timing logs
 - LLM Scoring: Relevance scoring (0-100 + tags) via executor, runs after fetch in scheduler
-- LLM Clustering: Batch clustering of scored articles into topic groups, labels stored in ranked.cluster
 - LLM Summarization: Per-article 2-3 sentence summaries via LLM, stored in ranked.llmSummary, runs after clustering in scheduler pipeline
-- Tooling: Biome lint, Vitest (107 tests passing), TypeScript strict mode
+- Settings: Central DB-backed key/value store (settings table) with service (getSetting, setSetting, seedDefaults), CRUD API, forward-compat for multi-user via nullable user_id, auto-seed on server startup. Holds weights, λ, tag vocab, scheduler config, per-task LLM model selection (primary + fallback)
+- LLM model selection: `getModelForTask()`/`getFallbackModelForTask()` read from settings at call time — hot-swap without restart
+- Tooling: Biome lint, Vitest (124 tests passing), TypeScript strict mode
 - DB scripts: Docker-based PostgreSQL start/stop/reset
 
 ## What's Next
 
-Task 18: Schema refactor (Phase 5: Composite Scoring + Settings begins).
+Task 22: LLM registry `analyze` task with prompt templating (reads allowed_tags from settings).
 
 ## Reference Docs
 

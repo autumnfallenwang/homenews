@@ -12,6 +12,7 @@ export const feedSchema = z.object({
   url: z.url(),
   category: z.string().nullable(),
   enabled: z.boolean(),
+  authorityScore: z.number().min(0).max(1),
   lastFetchedAt: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -51,26 +52,26 @@ export const articleSchema = z.object({
 
 export type Article = z.infer<typeof articleSchema>;
 
-export const rankedSchema = z.object({
+export const articleAnalysisSchema = z.object({
   id: z.string().uuid(),
   articleId: z.string().uuid(),
-  score: z.number().int().min(0).max(100),
+  relevance: z.number().int().min(0).max(100),
+  importance: z.number().int().min(0).max(100),
   tags: z.array(z.string()).nullable(),
-  cluster: z.string().nullable(),
   llmSummary: z.string().nullable(),
-  rankedAt: z.string(),
+  analyzedAt: z.string(),
 });
 
-export type Ranked = z.infer<typeof rankedSchema>;
+export type ArticleAnalysis = z.infer<typeof articleAnalysisSchema>;
 
-export const rankedArticleSchema = z.object({
+export const analyzedArticleSchema = z.object({
   id: z.string().uuid(),
   articleId: z.string().uuid(),
-  score: z.number().int().min(0).max(100),
+  relevance: z.number().int().min(0).max(100),
+  importance: z.number().int().min(0).max(100),
   tags: z.array(z.string()).nullable(),
-  cluster: z.string().nullable(),
   llmSummary: z.string().nullable(),
-  rankedAt: z.string(),
+  analyzedAt: z.string(),
   article: z.object({
     title: z.string(),
     link: z.url(),
@@ -81,11 +82,203 @@ export const rankedArticleSchema = z.object({
   }),
 });
 
-export type RankedArticle = z.infer<typeof rankedArticleSchema>;
+export type AnalyzedArticle = z.infer<typeof analyzedArticleSchema>;
 
-export const clusterInfoSchema = z.object({
-  cluster: z.string(),
-  count: z.number().int(),
+// --- Settings ---
+
+export const settingValueTypeSchema = z.enum(["number", "string", "boolean", "json"]);
+export type SettingValueType = z.infer<typeof settingValueTypeSchema>;
+
+export const settingSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid().nullable(),
+  key: z.string(),
+  value: z.unknown(),
+  valueType: settingValueTypeSchema,
+  description: z.string().nullable(),
+  updatedAt: z.string(),
 });
+export type Setting = z.infer<typeof settingSchema>;
 
-export type ClusterInfo = z.infer<typeof clusterInfoSchema>;
+export const updateSettingSchema = z
+  .object({
+    value: z.unknown(),
+    description: z.string().optional(),
+  })
+  .refine((data) => "value" in data && data.value !== undefined, {
+    message: "value is required",
+    path: ["value"],
+  });
+export type UpdateSetting = z.infer<typeof updateSettingSchema>;
+
+// --- Allowed tag vocabulary (memo Q5) ---
+export const ALLOWED_TAGS = [
+  // Topic areas
+  "ai-research",
+  "ml-theory",
+  "nlp",
+  "computer-vision",
+  "reinforcement-learning",
+  "robotics",
+  "ai-safety",
+  "ai-ethics",
+  "ai-regulation",
+  // Products/releases
+  "model-release",
+  "product-launch",
+  "feature-update",
+  "open-source",
+  // Content types
+  "tutorial",
+  "explainer",
+  "opinion",
+  "paper",
+  "benchmark",
+  "interview",
+  // Entities
+  "openai",
+  "anthropic",
+  "google",
+  "meta",
+  "microsoft",
+  "apple",
+  "nvidia",
+  "deepmind",
+  "huggingface",
+  "mistral",
+  // Applications
+  "coding",
+  "agents",
+  "chatbot",
+  "multimodal",
+  "fine-tuning",
+  "rag",
+  "inference",
+  "video-generation",
+  "audio-generation",
+  "dataset",
+] as const;
+export type AllowedTag = (typeof ALLOWED_TAGS)[number];
+
+// --- Default settings (source of truth for seeds and fallback lookups) ---
+export interface DefaultSetting {
+  value: unknown;
+  type: SettingValueType;
+  description: string;
+}
+
+export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
+  // Scoring weights (approx sum 1.0)
+  weight_relevance: {
+    value: 0.15,
+    type: "number",
+    description: "Weight for relevance in composite score",
+  },
+  weight_importance: {
+    value: 0.35,
+    type: "number",
+    description: "Weight for importance in composite score",
+  },
+  weight_freshness: {
+    value: 0.25,
+    type: "number",
+    description: "Weight for freshness (time decay) in composite score",
+  },
+  weight_authority: {
+    value: 0.1,
+    type: "number",
+    description: "Weight for source authority in composite score",
+  },
+  weight_uniqueness: {
+    value: 0.15,
+    type: "number",
+    description: "Weight for uniqueness (inverse duplicate) in composite score",
+  },
+
+  // Freshness decay
+  freshness_lambda: {
+    value: 0.03,
+    type: "number",
+    description: "Exponential decay rate per hour for freshness (0.03 ≈ 23h half-life)",
+  },
+
+  // Tag vocabulary
+  allowed_tags: {
+    value: ALLOWED_TAGS as readonly string[],
+    type: "json",
+    description: "Allowed tag vocabulary — LLM picks from this list for each article",
+  },
+
+  // Filters
+  min_score_default: {
+    value: 0,
+    type: "number",
+    description: "Default minimum score threshold for the ranked feed",
+  },
+
+  // Scheduler
+  scheduler_enabled: {
+    value: true,
+    type: "boolean",
+    description: "Master scheduler on/off switch",
+  },
+  fetch_interval: {
+    value: "*/30 * * * *",
+    type: "string",
+    description: "Cron expression for feed fetching",
+  },
+  analyze_enabled: {
+    value: true,
+    type: "boolean",
+    description: "Allow analyze LLM task to run automatically in scheduler",
+  },
+  summarize_enabled: {
+    value: true,
+    type: "boolean",
+    description: "Allow summarize LLM task to run automatically in scheduler",
+  },
+  analyze_batch_size: {
+    value: 100,
+    type: "number",
+    description: "Max articles to analyze per scheduler tick",
+  },
+  summarize_batch_size: {
+    value: 100,
+    type: "number",
+    description: "Max articles to summarize per scheduler tick",
+  },
+
+  // LLM model selection (per-task primary + fallback)
+  llm_model_scoring: {
+    value: "gpt-5.3-codex",
+    type: "string",
+    description: "Primary LLM model for scoring task",
+  },
+  llm_model_scoring_fallback: {
+    value: "gemma3:27b",
+    type: "string",
+    description: "Fallback LLM model for scoring task if primary fails",
+  },
+  llm_model_clustering: {
+    value: "gpt-5.3-codex",
+    type: "string",
+    description: "Primary LLM model for clustering task",
+  },
+  llm_model_clustering_fallback: {
+    value: "gemma3:27b",
+    type: "string",
+    description: "Fallback LLM model for clustering task if primary fails",
+  },
+  llm_model_summarization: {
+    value: "gpt-5.3-codex",
+    type: "string",
+    description: "Primary LLM model for summarization task",
+  },
+  llm_model_summarization_fallback: {
+    value: "gemma3:27b",
+    type: "string",
+    description: "Fallback LLM model for summarization task if primary fails",
+  },
+};
+
+export type SettingKey = keyof typeof DEFAULT_SETTINGS;

@@ -1,11 +1,11 @@
 "use client";
 
-import type { RankedArticle } from "@homenews/shared";
+import type { AnalyzedArticle } from "@homenews/shared";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -27,7 +27,7 @@ function scoreVariant(score: number) {
   return "outline" as const;
 }
 
-function ArticleCard({ item }: { item: RankedArticle }) {
+function ArticleCard({ item }: { item: AnalyzedArticle }) {
   return (
     <Card className="transition-colors hover:bg-accent/50">
       <CardHeader className="pb-3">
@@ -42,7 +42,7 @@ function ArticleCard({ item }: { item: RankedArticle }) {
               {item.article.feedName} &middot; {formatRelativeTime(item.article.publishedAt)}
             </CardDescription>
           </div>
-          <Badge variant={scoreVariant(item.score)}>{item.score}</Badge>
+          <Badge variant={scoreVariant(item.relevance)}>{item.relevance}</Badge>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
@@ -50,11 +50,6 @@ function ArticleCard({ item }: { item: RankedArticle }) {
           {item.llmSummary ?? item.article.summary ?? "No summary available."}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          {item.cluster && (
-            <Badge variant="outline" className="text-xs">
-              {item.cluster}
-            </Badge>
-          )}
           {item.tags?.map((tag) => (
             <Badge key={tag} variant="secondary" className="text-xs">
               {tag}
@@ -66,24 +61,7 @@ function ArticleCard({ item }: { item: RankedArticle }) {
   );
 }
 
-function buildUrl(params: Record<string, string | undefined>): string {
-  const search = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v) search.set(k, v);
-  }
-  const qs = search.toString();
-  return qs ? `/?${qs}` : "/";
-}
-
-export function DashboardFilters({
-  articles,
-  clusters,
-  activeCluster,
-}: {
-  articles: RankedArticle[];
-  clusters: { cluster: string; count: number }[];
-  activeCluster: string | undefined;
-}) {
+export function DashboardFilters({ articles }: { articles: AnalyzedArticle[] }) {
   const [query, setQuery] = useState("");
   const [activeSource, setActiveSource] = useState<string | null>(null);
 
@@ -110,39 +88,6 @@ export function DashboardFilters({
 
   return (
     <>
-      {/* Cluster Filter */}
-      {clusters.length > 0 && (
-        <div className="flex gap-2 mb-4 flex-wrap">
-          <Link
-            href="/"
-            className={buttonVariants({
-              variant: activeCluster ? "outline" : "default",
-              size: "sm",
-            })}
-          >
-            All
-            <Badge variant="secondary" className="ml-1.5">
-              {articles.length}
-            </Badge>
-          </Link>
-          {clusters.map((c) => (
-            <Link
-              key={c.cluster}
-              href={buildUrl({ cluster: c.cluster })}
-              className={buttonVariants({
-                variant: activeCluster === c.cluster ? "default" : "outline",
-                size: "sm",
-              })}
-            >
-              {c.cluster}
-              <Badge variant="secondary" className="ml-1.5">
-                {c.count}
-              </Badge>
-            </Link>
-          ))}
-        </div>
-      )}
-
       {/* Search + Source Filter */}
       <div className="flex gap-3 mb-4 flex-wrap items-center">
         <div className="relative flex-1 min-w-48">

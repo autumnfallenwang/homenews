@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockRankedRow = {
+const mockAnalysisRow = {
   id: "00000000-0000-0000-0000-000000000010",
   articleId: "00000000-0000-0000-0000-000000000020",
-  score: 85,
+  relevance: 85,
+  importance: 70,
   tags: ["ai", "llm"],
-  cluster: "AI Models",
   llmSummary: "A summary of the article.",
-  rankedAt: new Date("2026-01-01"),
+  analyzedAt: new Date("2026-01-01"),
   articleTitle: "GPT-5 Released",
   articleLink: "https://example.com/gpt5",
   articleSummary: "OpenAI launches GPT-5",
@@ -16,22 +16,11 @@ const mockRankedRow = {
   feedName: "TechCrunch",
 };
 
-const mockClusterRow = { cluster: "AI Models", count: 3 };
-
 let selectResult: unknown[] = [];
 
 function makeChain(result: unknown[]) {
   const promise = Promise.resolve(result);
-  const methods = [
-    "from",
-    "innerJoin",
-    "where",
-    "orderBy",
-    "limit",
-    "offset",
-    "groupBy",
-    "$dynamic",
-  ];
+  const methods = ["from", "innerJoin", "where", "orderBy", "limit", "offset", "groupBy"];
   for (const method of methods) {
     // biome-ignore lint/suspicious/noExplicitAny: test mock chaining
     (promise as any)[method] = vi.fn(() => promise);
@@ -55,7 +44,7 @@ import app from "../src/app.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  selectResult = [mockRankedRow];
+  selectResult = [mockAnalysisRow];
 });
 
 describe("GET /ranked", () => {
@@ -64,7 +53,8 @@ describe("GET /ranked", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
-    expect(data[0].score).toBe(85);
+    expect(data[0].relevance).toBe(85);
+    expect(data[0].importance).toBe(70);
     expect(data[0].article.title).toBe("GPT-5 Released");
     expect(data[0].article.feedName).toBe("TechCrunch");
   });
@@ -78,32 +68,13 @@ describe("GET /ranked", () => {
   });
 });
 
-describe("GET /ranked/clusters", () => {
-  it("returns cluster list with counts", async () => {
-    selectResult = [mockClusterRow];
-    const res = await app.request("/ranked/clusters");
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(Array.isArray(data)).toBe(true);
-    expect(data[0].cluster).toBe("AI Models");
-    expect(data[0].count).toBe(3);
-  });
-
-  it("returns empty array when no clusters", async () => {
-    selectResult = [];
-    const res = await app.request("/ranked/clusters");
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data).toEqual([]);
-  });
-});
-
 describe("GET /ranked/:id", () => {
   it("returns a single ranked article", async () => {
     const res = await app.request("/ranked/00000000-0000-0000-0000-000000000010");
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.id).toBe("00000000-0000-0000-0000-000000000010");
+    expect(data.relevance).toBe(85);
     expect(data.article.title).toBe("GPT-5 Released");
   });
 

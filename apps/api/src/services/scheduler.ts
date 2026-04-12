@@ -1,5 +1,4 @@
 import { type ScheduledTask, schedule } from "node-cron";
-import { clusterArticles } from "./clustering.js";
 import { fetchAllFeeds } from "./feed-fetcher.js";
 import { scoreUnscored } from "./scoring.js";
 import { summarizeUnsummarized } from "./summarization.js";
@@ -33,18 +32,6 @@ export function startScheduler(cronExpression = "*/30 * * * *"): ScheduledTask {
       } catch (err) {
         console.warn(
           `[scheduler] Scoring failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-
-      // Cluster scored articles
-      try {
-        const clusterResults = await clusterArticles();
-        console.info(
-          `[scheduler] Clustered ${clusterResults.clustered} articles, ${clusterResults.errors} errors`,
-        );
-      } catch (err) {
-        console.warn(
-          `[scheduler] Clustering failed: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
 

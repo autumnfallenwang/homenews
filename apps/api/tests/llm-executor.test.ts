@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockChatCompletion = vi.fn();
+const mockGetModelForTask = vi.fn();
+const mockGetFallbackModelForTask = vi.fn();
 
 vi.mock("../src/services/llm-client.js", () => ({
   chatCompletion: (...args: unknown[]) => mockChatCompletion(...args),
@@ -13,20 +15,26 @@ vi.mock("../src/services/llm-registry.js", () => ({
         name: "scoring",
         systemPrompt: "Score articles",
         outputFormat: "json",
-        model: "test-model",
       },
       summarization: {
         name: "summarization",
         systemPrompt: "Summarize articles",
         outputFormat: "text",
-        model: "test-model",
       },
     };
     return configs[task];
   },
+  getModelForTask: (task: string) => mockGetModelForTask(task),
+  getFallbackModelForTask: (task: string) => mockGetFallbackModelForTask(task),
 }));
 
 import { extractJson, llmExecute } from "../src/services/llm-executor.js";
+
+beforeEach(() => {
+  mockChatCompletion.mockReset();
+  mockGetModelForTask.mockReset();
+  mockGetFallbackModelForTask.mockReset();
+});
 
 describe("extractJson", () => {
   it("extracts JSON object from plain response", () => {
@@ -52,17 +60,21 @@ describe("extractJson", () => {
 
 describe("llmExecute", () => {
   it("returns parsed JSON for json outputFormat tasks", async () => {
+    mockGetModelForTask.mockResolvedValueOnce("primary-model");
+    mockGetFallbackModelForTask.mockResolvedValueOnce(null);
     mockChatCompletion.mockResolvedValueOnce('{"score": 85, "tags": ["ai"]}');
     const result = await llmExecute("scoring", "test prompt");
 
     expect(result.task).toBe("scoring");
-    expect(result.model).toBe("test-model");
+    expect(result.model).toBe("primary-model");
     expect(result.parsed).toEqual({ score: 85, tags: ["ai"] });
     expect(result.raw).toContain("score");
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
   it("returns raw text for text outputFormat tasks", async () => {
+    mockGetModelForTask.mockResolvedValueOnce("primary-model");
+    mockGetFallbackModelForTask.mockResolvedValueOnce(null);
     mockChatCompletion.mockResolvedValueOnce("This is a summary.");
     const result = await llmExecute("summarization", "test prompt");
 
@@ -72,6 +84,8 @@ describe("llmExecute", () => {
   });
 
   it("includes timing info", async () => {
+    mockGetModelForTask.mockResolvedValueOnce("primary-model");
+    mockGetFallbackModelForTask.mockResolvedValueOnce(null);
     mockChatCompletion.mockResolvedValueOnce('{"score": 50}');
     const result = await llmExecute("scoring", "test");
     expect(typeof result.durationMs).toBe("number");
@@ -79,7 +93,32 @@ describe("llmExecute", () => {
   });
 
   it("throws when LLM call fails and no fallback", async () => {
+    mockGetModelForTask.mockResolvedValueOnce("primary-model");
+    mockGetFallbackModelForTask.mockResolvedValueOnce(null);
     mockChatCompletion.mockRejectedValueOnce(new Error("API error"));
     await expect(llmExecute("scoring", "test")).rejects.toThrow("API error");
+  });
+
+  it("retries with fallback model when primary fails", async () => {
+    mockGetModelForTask.mockResolvedValueOnce("primary-model");
+    mockGetFallbackModelForTask.mockResolvedValueOnce("fallback-model");
+    mockChatCompletion
+      .mockRejectedValueOnce(new Error("Primary failed"))
+      .mockResolvedValueOnce('{"score": 42}');
+
+    const result = await llmExecute("scoring", "test");
+    expect(result.model).toBe("fallback-model");
+    expect(result.parsed).toEqual({ score: 42 });
+    expect(mockChatCompletion).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws when both primary and fallback fail", async () => {
+    mockGetModelForTask.mockResolvedValueOnce("primary-model");
+    mockGetFallbackModelForTask.mockResolvedValueOnce("fallback-model");
+    mockChatCompletion
+      .mockRejectedValueOnce(new Error("Primary failed"))
+      .mockRejectedValueOnce(new Error("Fallback failed"));
+
+    await expect(llmExecute("scoring", "test")).rejects.toThrow("Fallback failed");
   });
 });

@@ -1,25 +1,16 @@
-import type { RankedArticle } from "@homenews/shared";
+import type { AnalyzedArticle } from "@homenews/shared";
 import { Newspaper, Rss, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchClusters, fetchFeeds, fetchRanked } from "@/lib/api";
+import { fetchFeeds, fetchRanked } from "@/lib/api";
 import { DashboardFilters } from "./dashboard-filters";
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ cluster?: string }>;
-}) {
-  const params = await searchParams;
-  const activeCluster = params.cluster;
-
-  let articles: RankedArticle[] = [];
-  let clusters: { cluster: string; count: number }[] = [];
+export default async function Home() {
+  let articles: AnalyzedArticle[] = [];
   let feedCount = 0;
 
   try {
-    [articles, clusters, feedCount] = await Promise.all([
-      fetchRanked({ limit: 50, cluster: activeCluster }),
-      fetchClusters(),
+    [articles, feedCount] = await Promise.all([
+      fetchRanked({ limit: 50 }),
       fetchFeeds().then((f) => f.length),
     ]);
   } catch {
@@ -28,7 +19,7 @@ export default async function Home({
 
   const avgScore =
     articles.length > 0
-      ? Math.round(articles.reduce((sum, a) => sum + a.score, 0) / articles.length)
+      ? Math.round(articles.reduce((sum, a) => sum + a.relevance, 0) / articles.length)
       : 0;
 
   const sourceCount = new Set(articles.map((a) => a.article.feedName)).size;
@@ -37,9 +28,7 @@ export default async function Home({
     <main className="mx-auto max-w-5xl px-6 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {activeCluster ? activeCluster : "Today\u2019s Feed"}
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">Today&apos;s Feed</h1>
         <p className="text-muted-foreground mt-1">
           {articles.length > 0
             ? `${articles.length} articles ranked by relevance`
@@ -82,7 +71,7 @@ export default async function Home({
       </div>
 
       {/* Filters + Article List */}
-      <DashboardFilters articles={articles} clusters={clusters} activeCluster={activeCluster} />
+      <DashboardFilters articles={articles} />
     </main>
   );
 }

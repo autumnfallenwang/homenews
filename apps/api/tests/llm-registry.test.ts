@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { getTaskConfig, llmTasks } from "../src/services/llm-registry.js";
+import { describe, expect, it, vi } from "vitest";
+
+const getSettingMock = vi.fn();
+vi.mock("../src/services/settings.js", () => ({
+  getSetting: (key: string) => getSettingMock(key),
+}));
+
+import {
+  getFallbackModelForTask,
+  getModelForTask,
+  getTaskConfig,
+  llmTasks,
+} from "../src/services/llm-registry.js";
 
 describe("llmTasks", () => {
   const taskNames = Object.keys(llmTasks) as (keyof typeof llmTasks)[];
@@ -29,10 +40,6 @@ describe("llmTasks", () => {
       it("has a valid outputFormat", () => {
         expect(["json", "text"]).toContain(config.outputFormat);
       });
-
-      it("has a non-empty model", () => {
-        expect(config.model.length).toBeGreaterThan(0);
-      });
     });
   }
 });
@@ -58,13 +65,36 @@ describe("getTaskConfig", () => {
     expect(config.outputFormat).toBe("text");
     expect(config.systemPrompt).toContain("summary");
   });
+});
 
-  it("each task has a model that falls back to LLM_MODEL or default", () => {
-    // Without task-specific env vars set, all tasks should resolve to the same model
-    const models = Object.values(llmTasks).map((t) => t.model);
-    for (const model of models) {
-      expect(typeof model).toBe("string");
-      expect(model.length).toBeGreaterThan(0);
-    }
+// biome-ignore lint/security/noSecrets: false positive on function name
+describe("getModelForTask", () => {
+  it("reads llm_model_scoring setting for scoring task", async () => {
+    getSettingMock.mockResolvedValueOnce("gpt-5.3-codex");
+    const model = await getModelForTask("scoring");
+    expect(model).toBe("gpt-5.3-codex");
+    expect(getSettingMock).toHaveBeenCalledWith("llm_model_scoring");
+  });
+
+  it("reads llm_model_summarization setting for summarization task", async () => {
+    getSettingMock.mockResolvedValueOnce("gemma3:27b");
+    const model = await getModelForTask("summarization");
+    expect(model).toBe("gemma3:27b");
+    expect(getSettingMock).toHaveBeenCalledWith("llm_model_summarization");
+  });
+});
+
+describe("getFallbackModelForTask", () => {
+  it("reads llm_model_scoring_fallback setting", async () => {
+    getSettingMock.mockResolvedValueOnce("gemma3:27b");
+    const model = await getFallbackModelForTask("scoring");
+    expect(model).toBe("gemma3:27b");
+    expect(getSettingMock).toHaveBeenCalledWith("llm_model_scoring_fallback");
+  });
+
+  it("returns null when fallback setting is missing", async () => {
+    getSettingMock.mockRejectedValueOnce(new Error("Unknown setting key"));
+    const model = await getFallbackModelForTask("scoring");
+    expect(model).toBeNull();
   });
 });

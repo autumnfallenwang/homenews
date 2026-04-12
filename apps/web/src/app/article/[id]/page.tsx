@@ -61,10 +61,10 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {/* Score + Cluster + Tags */}
+      {/* Scores + Tags */}
       <div className="flex items-center gap-2 flex-wrap mb-6">
-        <Badge variant={scoreVariant(item.score)}>Score: {item.score}</Badge>
-        {item.cluster && <Badge variant="outline">{item.cluster}</Badge>}
+        <Badge variant={scoreVariant(item.relevance)}>Relevance: {item.relevance}</Badge>
+        <Badge variant={scoreVariant(item.importance)}>Importance: {item.importance}</Badge>
         {item.tags?.map((tag) => (
           <Badge key={tag} variant="secondary">
             {tag}

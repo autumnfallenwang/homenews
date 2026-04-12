@@ -259,6 +259,19 @@ Each question has a recommendation. Mark decisions inline as we go.
 - **Recommendation:** 0.03 — AI news moves fast
 - **Decision:** λ = 0.03 as starting value, stored in DB settings table (see Q1b below)
 
+**Q1c: LLM model selection — where does it live?**
+- Currently in `.env` as `LLM_MODEL`, `LLM_MODEL_SCORING`, etc. — read at module import time (no hot reload).
+- Question: move to settings table like weights/λ?
+- **Decision:** Move model selection entirely into the settings table. Per-task primary + fallback keys:
+  - `llm_model_analyze` / `llm_model_analyze_fallback`
+  - `llm_model_summarize` / `llm_model_summarize_fallback`
+- **`.env` keeps only infrastructure** — `DATABASE_URL`, `LLM_GATEWAY_URL`. Remove `LLM_MODEL` and all per-task model env vars.
+- **Implementation:** async `getModelForTask(task)` helper reads from settings at call time (not at import). The LLM executor reads both primary and fallback for each call. Cache in memory later if perf matters.
+- **Benefit:** hot-swap models via settings page, no restart needed. Consistent with weights/tag vocab — all tunables in one place.
+- **Scope:** tracked as Task 21 (inserted between type rename and analyze task work).
+
+---
+
 **Q1b: Settings storage mechanism (raised during Q1 discussion)**
 - Where do tunable constants (weights, λ, thresholds) live — `.env`, DB, or hybrid?
 - Discussion: `.env` can't support multi-user future; DB scales naturally by adding nullable `userId` column later

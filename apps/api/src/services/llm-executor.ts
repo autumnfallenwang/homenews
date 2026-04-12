@@ -1,7 +1,10 @@
 import { chatCompletion } from "./llm-client.js";
-import { getTaskConfig, type LlmTaskName } from "./llm-registry.js";
-
-const fallbackModel = process.env.LLM_FALLBACK_MODEL;
+import {
+  getFallbackModelForTask,
+  getModelForTask,
+  getTaskConfig,
+  type LlmTaskName,
+} from "./llm-registry.js";
 
 export interface LlmExecuteResult {
   raw: string;
@@ -21,21 +24,23 @@ export function extractJson(response: string): unknown {
 
 export async function llmExecute(task: LlmTaskName, prompt: string): Promise<LlmExecuteResult> {
   const config = getTaskConfig(task);
+  const primaryModel = await getModelForTask(task);
+  const fallbackModel = await getFallbackModelForTask(task);
   const start = Date.now();
 
   let raw: string;
-  let model = config.model;
+  let model = primaryModel;
 
   try {
     raw = await chatCompletion(prompt, {
       systemPrompt: config.systemPrompt,
-      model: config.model,
+      model: primaryModel,
     });
   } catch (err) {
-    if (!fallbackModel || fallbackModel === config.model) throw err;
+    if (!fallbackModel || fallbackModel === primaryModel) throw err;
 
     console.warn(
-      `[llm:${task}] Primary model ${config.model} failed, trying fallback ${fallbackModel}: ${err instanceof Error ? err.message : String(err)}`,
+      `[llm:${task}] Primary model ${primaryModel} failed, trying fallback ${fallbackModel}: ${err instanceof Error ? err.message : String(err)}`,
     );
     model = fallbackModel;
     raw = await chatCompletion(prompt, {

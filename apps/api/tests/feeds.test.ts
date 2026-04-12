@@ -7,6 +7,7 @@ const mockFeeds = [
     url: "https://example.com/feed.xml",
     category: "news",
     enabled: true,
+    authorityScore: 0.5,
     lastFetchedAt: null,
     createdAt: new Date("2026-01-01"),
   },

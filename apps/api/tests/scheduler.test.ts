@@ -8,10 +8,6 @@ vi.mock("../src/services/scoring.js", () => ({
   scoreUnscored: vi.fn().mockResolvedValue({ scored: 0, errors: 0 }),
 }));
 
-vi.mock("../src/services/clustering.js", () => ({
-  clusterArticles: vi.fn().mockResolvedValue({ clustered: 0, errors: 0 }),
-}));
-
 vi.mock("../src/services/summarization.js", () => ({
   summarizeUnsummarized: vi.fn().mockResolvedValue({ summarized: 0, errors: 0 }),
 }));

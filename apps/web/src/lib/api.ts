@@ -1,4 +1,4 @@
-import type { ClusterInfo, CreateFeed, Feed, RankedArticle, UpdateFeed } from "@homenews/shared";
+import type { AnalyzedArticle, CreateFeed, Feed, UpdateFeed } from "@homenews/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -6,29 +6,21 @@ export async function fetchRanked(params?: {
   limit?: number;
   offset?: number;
   minScore?: number;
-  cluster?: string;
-}): Promise<RankedArticle[]> {
+}): Promise<AnalyzedArticle[]> {
   const url = new URL(`${API_URL}/ranked`);
   if (params?.limit) url.searchParams.set("limit", String(params.limit));
   if (params?.offset) url.searchParams.set("offset", String(params.offset));
   if (params?.minScore) url.searchParams.set("minScore", String(params.minScore));
-  if (params?.cluster) url.searchParams.set("cluster", params.cluster);
 
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Failed to fetch ranked articles: ${res.status}`);
   return res.json();
 }
 
-export async function fetchRankedArticle(id: string): Promise<RankedArticle | null> {
+export async function fetchRankedArticle(id: string): Promise<AnalyzedArticle | null> {
   const res = await fetch(`${API_URL}/ranked/${id}`, { next: { revalidate: 300 } });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Failed to fetch ranked article: ${res.status}`);
-  return res.json();
-}
-
-export async function fetchClusters(): Promise<ClusterInfo[]> {
-  const res = await fetch(`${API_URL}/ranked/clusters`, { next: { revalidate: 300 } });
-  if (!res.ok) throw new Error(`Failed to fetch clusters: ${res.status}`);
   return res.json();
 }
 

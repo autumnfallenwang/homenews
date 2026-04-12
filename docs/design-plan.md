@@ -78,18 +78,20 @@ See [composite-scoring-memo.md](composite-scoring-memo.md) for full design.
 
 18. Schema refactor — new `article_analysis` table, `feeds.authority_score`, view, drop old `ranked` table
 19. Settings infrastructure — DB table (forward-compat for multi-user), API endpoints, shared Zod schemas, seeds for weights/λ/tag vocab/scheduler config
-20. LLM registry: `analyze` task with prompt templating — `{{ALLOWED_TAGS}}` placeholder from settings, remove old `scoring`/`clustering` tasks
-21. Analyze + summarize pipeline — new `analyze.ts` service, rename `summarization.ts` → `summarize.ts`, rewire scheduler to read enable toggles + batch sizes from settings
-22. Ranked API with composite score — read settings per query, compute freshness + composite in SQL, use `COALESCE(published_at, fetched_at)`
-23. Manual pipeline trigger API — `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints
-24. Settings page (web) — `/settings` route with weights, λ, tag vocabulary, scheduler config, pipeline control buttons, default filters
-25. Dashboard upgrade — tag filter (multi-select), weight sliders, multi-view sort (relevance/importance/freshness/composite)
-26. Feed management upgrade — authority score column in feeds table UI
+20. Type rename cleanup — rename `rankedSchema`/`Ranked`/`rankedArticleSchema`/`RankedArticle` → `articleAnalysisSchema`/`ArticleAnalysis`/`analyzedArticleSchema`/`AnalyzedArticle` in shared + consumers. Keep URL `/ranked` and function names (`fetchRanked`) unchanged — they describe the endpoint, not the data.
+21. Move LLM model selection to settings — per-task primary + fallback model keys in `DEFAULT_SETTINGS`, async `getModelForTask(task)` helper, executor reads fallback from settings, remove `LLM_MODEL`/`LLM_FALLBACK_MODEL` from `.env` (keep `LLM_GATEWAY_URL` only)
+22. LLM registry: `analyze` task with prompt templating — `{{ALLOWED_TAGS}}` placeholder from settings, remove old `scoring`/`clustering` tasks
+23. Analyze + summarize pipeline — new `analyze.ts` service, rename `summarization.ts` → `summarize.ts`, rewire scheduler to read enable toggles + batch sizes from settings
+24. Ranked API with composite score — read settings per query, compute freshness + composite in SQL, use `COALESCE(published_at, fetched_at)`
+25. Manual pipeline trigger API — `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints
+26. Settings page (web) — `/settings` route with weights, λ, tag vocabulary, scheduler config, pipeline control buttons, default filters
+27. Dashboard upgrade — tag filter (multi-select), weight sliders, multi-view sort (relevance/importance/freshness/composite)
+28. Feed management upgrade — authority score column in feeds table UI
 
 ### Phase 6 — iOS App
-27. iOS project setup
-28. Feed reader view
-29. Push notifications for high-score articles
+29. iOS project setup
+30. Feed reader view
+31. Push notifications for high-score articles
 
 ### Phase 7 — Future Enhancements (deferred)
 - Full article fetching for thin feeds

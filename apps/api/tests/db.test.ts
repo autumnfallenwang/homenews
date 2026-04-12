@@ -1,6 +1,6 @@
 import { getTableColumns, getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { articles, feeds, ranked } from "../src/db/schema.js";
+import { articleAnalysis, articles, feeds, settings } from "../src/db/schema.js";
 
 describe("feeds table", () => {
   it("has correct table name", () => {
@@ -10,7 +10,16 @@ describe("feeds table", () => {
   it("has all expected columns", () => {
     const cols = getTableColumns(feeds);
     expect(Object.keys(cols).sort()).toEqual(
-      ["id", "name", "url", "category", "enabled", "lastFetchedAt", "createdAt"].sort(),
+      [
+        "id",
+        "name",
+        "url",
+        "category",
+        "enabled",
+        "authorityScore",
+        "lastFetchedAt",
+        "createdAt",
+      ].sort(),
     );
   });
 
@@ -20,6 +29,7 @@ describe("feeds table", () => {
     expect(cols.name.notNull).toBe(true);
     expect(cols.url.notNull).toBe(true);
     expect(cols.enabled.notNull).toBe(true);
+    expect(cols.authorityScore.notNull).toBe(true);
     expect(cols.createdAt.notNull).toBe(true);
   });
 
@@ -72,30 +82,58 @@ describe("articles table", () => {
   });
 });
 
-describe("ranked table", () => {
+describe("article_analysis table", () => {
   it("has correct table name", () => {
-    expect(getTableName(ranked)).toBe("ranked");
+    expect(getTableName(articleAnalysis)).toBe("article_analysis");
   });
 
   it("has all expected columns", () => {
-    const cols = getTableColumns(ranked);
+    const cols = getTableColumns(articleAnalysis);
     expect(Object.keys(cols).sort()).toEqual(
-      ["id", "articleId", "score", "tags", "cluster", "llmSummary", "rankedAt"].sort(),
+      ["id", "articleId", "relevance", "importance", "tags", "llmSummary", "analyzedAt"].sort(),
     );
   });
 
   it("has notNull on required columns", () => {
-    const cols = getTableColumns(ranked);
+    const cols = getTableColumns(articleAnalysis);
     expect(cols.id.notNull).toBe(true);
     expect(cols.articleId.notNull).toBe(true);
-    expect(cols.score.notNull).toBe(true);
-    expect(cols.rankedAt.notNull).toBe(true);
+    expect(cols.relevance.notNull).toBe(true);
+    expect(cols.importance.notNull).toBe(true);
+    expect(cols.analyzedAt.notNull).toBe(true);
   });
 
   it("allows null on optional columns", () => {
-    const cols = getTableColumns(ranked);
+    const cols = getTableColumns(articleAnalysis);
     expect(cols.tags.notNull).toBe(false);
-    expect(cols.cluster.notNull).toBe(false);
     expect(cols.llmSummary.notNull).toBe(false);
+  });
+});
+
+describe("settings table", () => {
+  it("has correct table name", () => {
+    expect(getTableName(settings)).toBe("settings");
+  });
+
+  it("has all expected columns", () => {
+    const cols = getTableColumns(settings);
+    expect(Object.keys(cols).sort()).toEqual(
+      ["id", "userId", "key", "value", "valueType", "description", "updatedAt"].sort(),
+    );
+  });
+
+  it("has notNull on required columns", () => {
+    const cols = getTableColumns(settings);
+    expect(cols.id.notNull).toBe(true);
+    expect(cols.key.notNull).toBe(true);
+    expect(cols.value.notNull).toBe(true);
+    expect(cols.valueType.notNull).toBe(true);
+    expect(cols.updatedAt.notNull).toBe(true);
+  });
+
+  it("allows null on userId (multi-user forward-compat)", () => {
+    const cols = getTableColumns(settings);
+    expect(cols.userId.notNull).toBe(false);
+    expect(cols.description.notNull).toBe(false);
   });
 });
