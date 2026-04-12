@@ -47,9 +47,9 @@ See [composite-scoring-memo.md](composite-scoring-memo.md) for full design and a
 | 19 | Settings infrastructure | Done | DB table (forward-compat nullable user_id), CRUD API, Zod schemas, DEFAULT_SETTINGS seed, auto-seed on startup |
 | 20 | Type rename cleanup | Done | `Ranked`/`RankedArticle` → `ArticleAnalysis`/`AnalyzedArticle` in shared + web consumers. URL `/ranked` kept |
 | 21 | Move LLM model selection to settings | Done | Per-task primary + fallback in settings, async `getModelForTask()`/`getFallbackModelForTask()`, executor hot-reads per call, removed model env vars |
-| 22 | LLM registry: `analyze` task | Not started | Prompt template with `{{ALLOWED_TAGS}}` from settings, drop old `scoring`/`clustering` |
-| 23 | Analyze + summarize pipeline | Not started | New `analyze.ts`, rename `summarization.ts` → `summarize.ts`, scheduler reads enable toggles + batch sizes from settings |
-| 24 | Ranked API with composite score | Not started | SQL compute via view + settings, COALESCE for missing dates |
+| 22 | LLM registry: `analyze` task | Done | New `analyze` + `summarize` tasks, `getSystemPrompt()` with `{{ALLOWED_TAGS}}` templating, model settings keys, legacy tasks kept until Task 23 |
+| 23 | Analyze + summarize pipeline | Done | New `analyze.ts` (relevance + importance + controlled tags), `summarize.ts`, scheduler reads enable toggles + batch sizes from settings, legacy `scoring`/`summarization`/`clustering` tasks dropped |
+| 24 | Ranked API with composite score | Done | SQL compute via `article_analysis_with_feed` view + settings, freshness decay, COALESCE for missing dates, sorted by composite |
 | 25 | Manual pipeline trigger API | Not started | `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints |
 | 26 | Settings page (web) | Not started | `/settings` route with weights, λ, tags, scheduler, pipeline control buttons, minScore |
 | 27 | Dashboard upgrade | Not started | Tag multi-select filter, weight sliders, multi-view sort |
@@ -67,25 +67,28 @@ See [composite-scoring-memo.md](composite-scoring-memo.md) for full design and a
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
 - Monorepo: Turborepo + pnpm workspace with 3 packages (api, web, shared)
-- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (list/filter/paginate, detail) + settings API (GET list, GET/PATCH by key, reset)
+- API: Hono server on port 3001 with health check + feed management endpoints (CRUD, manual fetch triggers) + ranked articles API (composite-scored list/filter/paginate, detail, includes freshness + feedAuthorityScore) + settings API (GET list, GET/PATCH by key, reset)
 - Web: Next.js App Router on port 3000 with Tailwind CSS v4 + shadcn/ui components + dashboard (with cluster/search/source filters) + feed management page + article detail view
 - Shared: Zod schemas for Feed (with authorityScore), Article, ArticleAnalysis (relevance + importance), AnalyzedArticle, CreateFeed, UpdateFeed, Setting, UpdateSetting + DEFAULT_SETTINGS + ALLOWED_TAGS vocabulary (~39 tags)
 - Database: Drizzle ORM schema (feeds + authority_score, articles, article_analysis, settings with nullable user_id), article_analysis_with_feed view, seed scripts for feeds + settings
 - RSS Fetcher: rss-parser integration with pure mapping layer, fetchFeed/fetchAllFeeds services, duplicate handling via onConflictDoNothing
 - Scheduler: node-cron job runs fetchAllFeeds every 30 min (configurable via FETCH_INTERVAL), noOverlap protection, start/stop exports
 - Deduplication: URL-level via unique constraint + title similarity via bigram Dice coefficient, runs inline during fetch, 48h window
-- LLM Registry: Central task config (llm-registry.ts) — prompts, output formats, per-task model selection via env vars
-- LLM Executor: Unified llmExecute() — auto JSON extraction, model fallback (LLM_FALLBACK_MODEL), timing logs
-- LLM Scoring: Relevance scoring (0-100 + tags) via executor, runs after fetch in scheduler
-- LLM Summarization: Per-article 2-3 sentence summaries via LLM, stored in ranked.llmSummary, runs after clustering in scheduler pipeline
+- LLM Registry: Central task config (llm-registry.ts) — prompts, output formats, per-task model selection via settings; only `analyze` + `summarize` tasks remain
+- LLM Executor: Unified llmExecute() — auto JSON extraction, model fallback from settings, timing logs
+- LLM Analyze: New `analyze.ts` service produces relevance (0-100), importance (0-100), and controlled-vocabulary tags in one LLM call; tags filtered against `allowed_tags` setting with unknown-tag warnings
+- LLM Summarize: `summarize.ts` produces 2-3 sentence per-article summaries via `summarize` task
+- Scheduler: reads `scheduler_enabled` / `analyze_enabled` / `summarize_enabled` / `analyze_batch_size` / `summarize_batch_size` from settings — hot-controllable without restart
+- Composite ranking: `GET /ranked` computes `compositeScore = w_rel*rel + w_imp*imp + w_fresh*EXP(-λ*hours) + w_auth*authorityScore + w_uniq*1.0` at query time, sorted DESC. Weights + λ read from settings per request — hot-tunable without restart
 - Settings: Central DB-backed key/value store (settings table) with service (getSetting, setSetting, seedDefaults), CRUD API, forward-compat for multi-user via nullable user_id, auto-seed on server startup. Holds weights, λ, tag vocab, scheduler config, per-task LLM model selection (primary + fallback)
 - LLM model selection: `getModelForTask()`/`getFallbackModelForTask()` read from settings at call time — hot-swap without restart
-- Tooling: Biome lint, Vitest (124 tests passing), TypeScript strict mode
+- LLM prompt templating: `getSystemPrompt()` resolves `{{ALLOWED_TAGS}}` placeholder from settings for `analyze` task; static prompts returned as-is for other tasks
+- Tooling: Biome lint, Vitest (125 tests passing), TypeScript strict mode
 - DB scripts: Docker-based PostgreSQL start/stop/reset
 
 ## What's Next
 
-Task 22: LLM registry `analyze` task with prompt templating (reads allowed_tags from settings).
+Task 25: Manual pipeline trigger API (POST /admin/pipeline/{fetch,analyze,summarize,run-all}).
 
 ## Reference Docs
 

@@ -72,6 +72,8 @@ export const analyzedArticleSchema = z.object({
   tags: z.array(z.string()).nullable(),
   llmSummary: z.string().nullable(),
   analyzedAt: z.string(),
+  freshness: z.number(), // 0..1 — exponential decay from publishedAt/fetchedAt
+  compositeScore: z.number(), // weighted sum of all dimensions, computed from settings
   article: z.object({
     title: z.string(),
     link: z.url(),
@@ -79,6 +81,7 @@ export const analyzedArticleSchema = z.object({
     author: z.string().nullable(),
     publishedAt: z.string().nullable(),
     feedName: z.string(),
+    feedAuthorityScore: z.number().min(0).max(1),
   }),
 });
 
@@ -249,35 +252,25 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
   },
 
   // LLM model selection (per-task primary + fallback)
-  llm_model_scoring: {
-    value: "gpt-5.3-codex",
+  llm_model_analyze: {
+    value: "gpt-5.1-codex-mini",
     type: "string",
-    description: "Primary LLM model for scoring task",
+    description: "Primary LLM model for analyze task (classification: relevance, importance, tags)",
   },
-  llm_model_scoring_fallback: {
+  llm_model_analyze_fallback: {
     value: "gemma3:27b",
     type: "string",
-    description: "Fallback LLM model for scoring task if primary fails",
+    description: "Fallback LLM model for analyze task if primary fails",
   },
-  llm_model_clustering: {
+  llm_model_summarize: {
     value: "gpt-5.3-codex",
     type: "string",
-    description: "Primary LLM model for clustering task",
+    description: "Primary LLM model for summarize task (text generation)",
   },
-  llm_model_clustering_fallback: {
+  llm_model_summarize_fallback: {
     value: "gemma3:27b",
     type: "string",
-    description: "Fallback LLM model for clustering task if primary fails",
-  },
-  llm_model_summarization: {
-    value: "gpt-5.3-codex",
-    type: "string",
-    description: "Primary LLM model for summarization task",
-  },
-  llm_model_summarization_fallback: {
-    value: "gemma3:27b",
-    type: "string",
-    description: "Fallback LLM model for summarization task if primary fails",
+    description: "Fallback LLM model for summarize task if primary fails",
   },
 };
 

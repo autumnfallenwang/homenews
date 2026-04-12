@@ -32,15 +32,14 @@ export async function summarizeArticle(
   content: string | null,
 ): Promise<string> {
   const prompt = buildSummaryPrompt(title, summary, content);
-  const result = await llmExecute("summarization", prompt);
+  const result = await llmExecute("summarize", prompt);
   return parseSummaryResponse(result.raw);
 }
 
-export async function summarizeUnsummarized(): Promise<{
-  summarized: number;
-  errors: number;
-}> {
-  const unsummarized = await db
+export async function summarizeUnsummarized(
+  limit?: number,
+): Promise<{ summarized: number; errors: number }> {
+  const baseQuery = db
     .select({
       analysisId: articleAnalysis.id,
       title: articles.title,
@@ -50,6 +49,8 @@ export async function summarizeUnsummarized(): Promise<{
     .from(articleAnalysis)
     .innerJoin(articles, eq(articleAnalysis.articleId, articles.id))
     .where(isNull(articleAnalysis.llmSummary));
+
+  const unsummarized = limit && limit > 0 ? await baseQuery.limit(limit) : await baseQuery;
 
   let summarized = 0;
   let errors = 0;
@@ -64,7 +65,7 @@ export async function summarizeUnsummarized(): Promise<{
       summarized++;
     } catch (err) {
       console.warn(
-        `[summarization] Failed for "${row.title}": ${err instanceof Error ? err.message : String(err)}`,
+        `[summarize] Failed for "${row.title}": ${err instanceof Error ? err.message : String(err)}`,
       );
       errors++;
     }

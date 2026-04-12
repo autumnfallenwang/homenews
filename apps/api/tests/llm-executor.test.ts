@@ -11,18 +11,25 @@ vi.mock("../src/services/llm-client.js", () => ({
 vi.mock("../src/services/llm-registry.js", () => ({
   getTaskConfig: (task: string) => {
     const configs: Record<string, unknown> = {
-      scoring: {
-        name: "scoring",
-        systemPrompt: "Score articles",
+      analyze: {
+        name: "analyze",
+        systemPromptTemplate: "Analyze articles",
         outputFormat: "json",
       },
-      summarization: {
-        name: "summarization",
+      summarize: {
+        name: "summarize",
         systemPrompt: "Summarize articles",
         outputFormat: "text",
       },
     };
     return configs[task];
+  },
+  getSystemPrompt: (task: string) => {
+    const prompts: Record<string, string> = {
+      analyze: "Analyze articles",
+      summarize: "Summarize articles",
+    };
+    return Promise.resolve(prompts[task] ?? "");
   },
   getModelForTask: (task: string) => mockGetModelForTask(task),
   getFallbackModelForTask: (task: string) => mockGetFallbackModelForTask(task),
@@ -63,9 +70,9 @@ describe("llmExecute", () => {
     mockGetModelForTask.mockResolvedValueOnce("primary-model");
     mockGetFallbackModelForTask.mockResolvedValueOnce(null);
     mockChatCompletion.mockResolvedValueOnce('{"score": 85, "tags": ["ai"]}');
-    const result = await llmExecute("scoring", "test prompt");
+    const result = await llmExecute("analyze", "test prompt");
 
-    expect(result.task).toBe("scoring");
+    expect(result.task).toBe("analyze");
     expect(result.model).toBe("primary-model");
     expect(result.parsed).toEqual({ score: 85, tags: ["ai"] });
     expect(result.raw).toContain("score");
@@ -76,9 +83,9 @@ describe("llmExecute", () => {
     mockGetModelForTask.mockResolvedValueOnce("primary-model");
     mockGetFallbackModelForTask.mockResolvedValueOnce(null);
     mockChatCompletion.mockResolvedValueOnce("This is a summary.");
-    const result = await llmExecute("summarization", "test prompt");
+    const result = await llmExecute("summarize", "test prompt");
 
-    expect(result.task).toBe("summarization");
+    expect(result.task).toBe("summarize");
     expect(result.raw).toBe("This is a summary.");
     expect(result.parsed).toBeUndefined();
   });
@@ -87,7 +94,7 @@ describe("llmExecute", () => {
     mockGetModelForTask.mockResolvedValueOnce("primary-model");
     mockGetFallbackModelForTask.mockResolvedValueOnce(null);
     mockChatCompletion.mockResolvedValueOnce('{"score": 50}');
-    const result = await llmExecute("scoring", "test");
+    const result = await llmExecute("analyze", "test");
     expect(typeof result.durationMs).toBe("number");
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -96,7 +103,7 @@ describe("llmExecute", () => {
     mockGetModelForTask.mockResolvedValueOnce("primary-model");
     mockGetFallbackModelForTask.mockResolvedValueOnce(null);
     mockChatCompletion.mockRejectedValueOnce(new Error("API error"));
-    await expect(llmExecute("scoring", "test")).rejects.toThrow("API error");
+    await expect(llmExecute("analyze", "test")).rejects.toThrow("API error");
   });
 
   it("retries with fallback model when primary fails", async () => {
@@ -106,7 +113,7 @@ describe("llmExecute", () => {
       .mockRejectedValueOnce(new Error("Primary failed"))
       .mockResolvedValueOnce('{"score": 42}');
 
-    const result = await llmExecute("scoring", "test");
+    const result = await llmExecute("analyze", "test");
     expect(result.model).toBe("fallback-model");
     expect(result.parsed).toEqual({ score: 42 });
     expect(mockChatCompletion).toHaveBeenCalledTimes(2);
@@ -119,6 +126,6 @@ describe("llmExecute", () => {
       .mockRejectedValueOnce(new Error("Primary failed"))
       .mockRejectedValueOnce(new Error("Fallback failed"));
 
-    await expect(llmExecute("scoring", "test")).rejects.toThrow("Fallback failed");
+    await expect(llmExecute("analyze", "test")).rejects.toThrow("Fallback failed");
   });
 });

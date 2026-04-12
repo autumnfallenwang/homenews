@@ -5,7 +5,7 @@ vi.mock("../src/services/llm-executor.js", () => ({
   llmExecute: vi.fn(),
 }));
 
-import { buildSummaryPrompt, parseSummaryResponse } from "../src/services/summarization.js";
+import { buildSummaryPrompt, parseSummaryResponse } from "../src/services/summarize.js";
 
 describe("buildSummaryPrompt", () => {
   it("builds prompt with title only", () => {
@@ -31,7 +31,6 @@ describe("buildSummaryPrompt", () => {
     const longContent = "a".repeat(3000);
     const prompt = buildSummaryPrompt("Title", null, longContent);
     expect(prompt).toContain("Content:");
-    // Title: Title\nContent: + 2000 chars
     const contentPart = prompt.split("Content: ")[1];
     expect(contentPart).toHaveLength(2000);
   });

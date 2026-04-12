@@ -4,12 +4,23 @@ vi.mock("../src/services/feed-fetcher.js", () => ({
   fetchAllFeeds: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../src/services/scoring.js", () => ({
-  scoreUnscored: vi.fn().mockResolvedValue({ scored: 0, errors: 0 }),
+vi.mock("../src/services/analyze.js", () => ({
+  analyzeUnanalyzed: vi.fn().mockResolvedValue({ analyzed: 0, errors: 0 }),
 }));
 
-vi.mock("../src/services/summarization.js", () => ({
+vi.mock("../src/services/summarize.js", () => ({
   summarizeUnsummarized: vi.fn().mockResolvedValue({ summarized: 0, errors: 0 }),
+}));
+
+vi.mock("../src/services/settings.js", () => ({
+  getSetting: vi.fn((key: string) => {
+    if (key === "scheduler_enabled") return Promise.resolve(true);
+    if (key === "analyze_enabled") return Promise.resolve(true);
+    if (key === "summarize_enabled") return Promise.resolve(true);
+    if (key === "analyze_batch_size") return Promise.resolve(100);
+    if (key === "summarize_batch_size") return Promise.resolve(100);
+    return Promise.resolve(undefined);
+  }),
 }));
 
 import { startScheduler, stopScheduler } from "../src/services/scheduler.js";
