@@ -5,7 +5,7 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -113,28 +113,32 @@ export function DashboardFilters({
       {/* Cluster Filter */}
       {clusters.length > 0 && (
         <div className="flex gap-2 mb-4 flex-wrap">
-          <Button
-            variant={activeCluster ? "outline" : "default"}
-            size="sm"
-            render={<Link href="/" />}
+          <Link
+            href="/"
+            className={buttonVariants({
+              variant: activeCluster ? "outline" : "default",
+              size: "sm",
+            })}
           >
             All
             <Badge variant="secondary" className="ml-1.5">
               {articles.length}
             </Badge>
-          </Button>
+          </Link>
           {clusters.map((c) => (
-            <Button
+            <Link
               key={c.cluster}
-              variant={activeCluster === c.cluster ? "default" : "outline"}
-              size="sm"
-              render={<Link href={buildUrl({ cluster: c.cluster })} />}
+              href={buildUrl({ cluster: c.cluster })}
+              className={buttonVariants({
+                variant: activeCluster === c.cluster ? "default" : "outline",
+                size: "sm",
+              })}
             >
               {c.cluster}
               <Badge variant="secondary" className="ml-1.5">
                 {c.count}
               </Badge>
-            </Button>
+            </Link>
           ))}
         </div>
       )}

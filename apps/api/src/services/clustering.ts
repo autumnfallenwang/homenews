@@ -1,30 +1,18 @@
 import { eq, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { articles, ranked } from "../db/schema.js";
-import { chatCompletion } from "./llm-client.js";
-
-const SYSTEM_PROMPT = `You are a news article clustering assistant.
-Given a list of article IDs and titles, group related articles into clusters.
-Each cluster should have a short descriptive label (2-5 words).
-Respond ONLY with valid JSON in this exact format:
-{"clusters": {"article_id": "Cluster Label", "article_id2": "Cluster Label", ...}}
-Every article must be assigned to exactly one cluster. Articles that don't fit any group get their own unique cluster label.`;
+import { llmExecute } from "./llm-executor.js";
 
 export function buildClusteringPrompt(items: { id: string; title: string }[]): string {
   const lines = items.map((a) => `- [${a.id}] ${a.title}`);
   return `Group these articles into topic clusters:\n\n${lines.join("\n")}`;
 }
 
-export function parseClusterResponse(response: string, articleIds: string[]): Map<string, string> {
+export function parseClusterResult(parsed: unknown, articleIds: string[]): Map<string, string> {
   const result = new Map<string, string>();
 
-  const jsonMatch = response.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("No JSON found in LLM response");
-  }
-
-  const parsed = JSON.parse(jsonMatch[0]);
-  const clusters = parsed.clusters ?? parsed;
+  const obj = parsed as Record<string, unknown>;
+  const clusters = (obj.clusters ?? obj) as Record<string, unknown>;
 
   if (typeof clusters !== "object" || clusters === null) {
     throw new Error("Invalid cluster response format");
@@ -44,7 +32,6 @@ export async function clusterArticles(): Promise<{
   clustered: number;
   errors: number;
 }> {
-  // Find scored but unclustered articles
   const unclustered = await db
     .select({
       rankedId: ranked.id,
@@ -63,9 +50,9 @@ export async function clusterArticles(): Promise<{
 
   try {
     const prompt = buildClusteringPrompt(items);
-    const response = await chatCompletion(prompt, { systemPrompt: SYSTEM_PROMPT });
-    const clusterMap = parseClusterResponse(
-      response,
+    const result = await llmExecute("clustering", prompt);
+    const clusterMap = parseClusterResult(
+      result.parsed,
       items.map((i) => i.id),
     );
 

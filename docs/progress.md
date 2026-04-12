@@ -33,17 +33,33 @@
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 15 | LLM task registry | Not started | Central config for all LLM tasks (prompts, models, output formats) |
-| 16 | Per-task model config | Not started | Env var overrides per task (LLM_MODEL_SCORING, etc.) |
-| 17 | Unified LLM executor | Not started | Single llmExecute() with auto-parsing, fallback, logging |
+| 15 | LLM task registry | Done | Central registry with task configs (prompts, output formats), services import from registry |
+| 16 | Per-task model config | Done | Per-task env var overrides (LLM_MODEL_SCORING, etc.) with fallback chain |
+| 17 | Unified LLM executor | Done | llmExecute() with auto JSON extraction, model fallback, timing logs |
 
-## Phase 5: iOS App
+## Phase 5: Composite Scoring + Settings
+
+See [composite-scoring-memo.md](composite-scoring-memo.md) for full design and all 15 open-question decisions.
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 18 | iOS project setup | Not started | Swift package, API client |
-| 19 | Feed reader view | Not started | Ranked articles list |
-| 20 | Push notifications | Not started | High-score article alerts |
+| 18 | Schema refactor | Not started | New `article_analysis` table, `feeds.authority_score`, view, drop old `ranked` |
+| 19 | Settings infrastructure | Not started | DB table (multi-user forward-compat), API, Zod schemas, seeds for weights/λ/tags/scheduler config |
+| 20 | LLM registry: `analyze` task | Not started | Prompt template with `{{ALLOWED_TAGS}}` from settings, drop old `scoring`/`clustering` |
+| 21 | Analyze + summarize pipeline | Not started | New `analyze.ts`, rename `summarization.ts` → `summarize.ts`, scheduler reads enable toggles + batch sizes from settings |
+| 22 | Ranked API with composite score | Not started | SQL compute via view + settings, COALESCE for missing dates |
+| 23 | Manual pipeline trigger API | Not started | `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints |
+| 24 | Settings page (web) | Not started | `/settings` route with weights, λ, tags, scheduler, pipeline control buttons, minScore |
+| 25 | Dashboard upgrade | Not started | Tag multi-select filter, weight sliders, multi-view sort |
+| 26 | Feed management upgrade | Not started | Authority score column in feeds table UI |
+
+## Phase 6: iOS App
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 27 | iOS project setup | Not started | Swift package, API client |
+| 28 | Feed reader view | Not started | Ranked articles list |
+| 29 | Push notifications | Not started | High-score article alerts |
 
 ## What's Working
 
@@ -56,15 +72,17 @@
 - RSS Fetcher: rss-parser integration with pure mapping layer, fetchFeed/fetchAllFeeds services, duplicate handling via onConflictDoNothing
 - Scheduler: node-cron job runs fetchAllFeeds every 30 min (configurable via FETCH_INTERVAL), noOverlap protection, start/stop exports
 - Deduplication: URL-level via unique constraint + title similarity via bigram Dice coefficient, runs inline during fetch, 48h window
-- LLM Scoring: OpenAI-compatible client via local llmgw, relevance scoring (0-100 + tags), runs after fetch in scheduler, graceful error handling
+- LLM Registry: Central task config (llm-registry.ts) — prompts, output formats, per-task model selection via env vars
+- LLM Executor: Unified llmExecute() — auto JSON extraction, model fallback (LLM_FALLBACK_MODEL), timing logs
+- LLM Scoring: Relevance scoring (0-100 + tags) via executor, runs after fetch in scheduler
 - LLM Clustering: Batch clustering of scored articles into topic groups, labels stored in ranked.cluster
 - LLM Summarization: Per-article 2-3 sentence summaries via LLM, stored in ranked.llmSummary, runs after clustering in scheduler pipeline
-- Tooling: Biome lint, Vitest (82 tests passing), TypeScript strict mode
+- Tooling: Biome lint, Vitest (107 tests passing), TypeScript strict mode
 - DB scripts: Docker-based PostgreSQL start/stop/reset
 
 ## What's Next
 
-Debug current pipeline, then Task 15: LLM task registry (Phase 4: LLM Registry Refactor).
+Task 18: Schema refactor (Phase 5: Composite Scoring + Settings begins).
 
 ## Reference Docs
 

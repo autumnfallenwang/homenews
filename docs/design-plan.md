@@ -73,13 +73,30 @@ Ranked     { id, articleId, score, tags, cluster, llmSummary, rankedAt }
 16. Per-task model config — env var overrides (LLM_MODEL_SCORING, LLM_MODEL_SUMMARIZATION, etc.)
 17. Unified LLM executor — single llmExecute() with auto-parsing, fallback, logging
 
-### Phase 5 — iOS App
-18. iOS project setup
-19. Feed reader view
-20. Push notifications for high-score articles
+### Phase 5 — Composite Scoring + Settings
+See [composite-scoring-memo.md](composite-scoring-memo.md) for full design.
 
-### Phase 6 — Future Enhancements (deferred)
+18. Schema refactor — new `article_analysis` table, `feeds.authority_score`, view, drop old `ranked` table
+19. Settings infrastructure — DB table (forward-compat for multi-user), API endpoints, shared Zod schemas, seeds for weights/λ/tag vocab/scheduler config
+20. LLM registry: `analyze` task with prompt templating — `{{ALLOWED_TAGS}}` placeholder from settings, remove old `scoring`/`clustering` tasks
+21. Analyze + summarize pipeline — new `analyze.ts` service, rename `summarization.ts` → `summarize.ts`, rewire scheduler to read enable toggles + batch sizes from settings
+22. Ranked API with composite score — read settings per query, compute freshness + composite in SQL, use `COALESCE(published_at, fetched_at)`
+23. Manual pipeline trigger API — `POST /admin/pipeline/{fetch,analyze,summarize,run-all}` endpoints
+24. Settings page (web) — `/settings` route with weights, λ, tag vocabulary, scheduler config, pipeline control buttons, default filters
+25. Dashboard upgrade — tag filter (multi-select), weight sliders, multi-view sort (relevance/importance/freshness/composite)
+26. Feed management upgrade — authority score column in feeds table UI
+
+### Phase 6 — iOS App
+27. iOS project setup
+28. Feed reader view
+29. Push notifications for high-score articles
+
+### Phase 7 — Future Enhancements (deferred)
 - Full article fetching for thin feeds
 - Custom topic profiles
 - Trend detection over time
 - Export/share digests
+- HTTP conditional requests for RSS (If-Modified-Since, ETag)
+- Rejected-tag suggestion queue (deferred from Q6)
+- Multi-user authentication layer
+- Materialized view if query performance becomes a concern

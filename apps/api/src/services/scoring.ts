@@ -1,18 +1,13 @@
 import { and, eq, isNull, notExists } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { articles, ranked } from "../db/schema.js";
-import { chatCompletion } from "./llm-client.js";
+import { llmExecute } from "./llm-executor.js";
 
 export interface ScoreResult {
   score: number;
   tags: string[];
   reasoning: string;
 }
-
-const SYSTEM_PROMPT = `You are a news relevance scorer for an AI/ML/tech news feed.
-Rate each article's relevance to AI, machine learning, and technology on a scale of 0-100.
-Respond ONLY with valid JSON in this exact format:
-{"score": <number 0-100>, "tags": [<string tags>], "reasoning": "<brief explanation>"}`;
 
 export function buildScoringPrompt(title: string, summary: string | null): string {
   let prompt = `Title: ${title}`;
@@ -22,29 +17,24 @@ export function buildScoringPrompt(title: string, summary: string | null): strin
   return prompt;
 }
 
-export function parseScoreResponse(response: string): ScoreResult {
-  const jsonMatch = response.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("No JSON found in LLM response");
-  }
+export function parseScoreResult(parsed: unknown): ScoreResult {
+  const obj = parsed as Record<string, unknown>;
 
-  const parsed = JSON.parse(jsonMatch[0]);
-
-  if (typeof parsed.score !== "number" || parsed.score < 0 || parsed.score > 100) {
-    throw new Error(`Invalid score: ${parsed.score}`);
+  if (typeof obj.score !== "number" || obj.score < 0 || obj.score > 100) {
+    throw new Error(`Invalid score: ${obj.score}`);
   }
 
   return {
-    score: Math.round(parsed.score),
-    tags: Array.isArray(parsed.tags) ? parsed.tags.map(String) : [],
-    reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : "",
+    score: Math.round(obj.score),
+    tags: Array.isArray(obj.tags) ? obj.tags.map(String) : [],
+    reasoning: typeof obj.reasoning === "string" ? obj.reasoning : "",
   };
 }
 
 export async function scoreArticle(title: string, summary: string | null): Promise<ScoreResult> {
   const prompt = buildScoringPrompt(title, summary);
-  const response = await chatCompletion(prompt, { systemPrompt: SYSTEM_PROMPT });
-  return parseScoreResponse(response);
+  const result = await llmExecute("scoring", prompt);
+  return parseScoreResult(result.parsed);
 }
 
 export async function scoreUnscored(): Promise<{ scored: number; errors: number }> {

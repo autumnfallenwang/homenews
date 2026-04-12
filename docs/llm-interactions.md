@@ -12,6 +12,11 @@ Scheduler (cron every 30min)
   └─ summarizeUnsummarized() ← LLM call per article
 ```
 
+**Registry:** `apps/api/src/services/llm-registry.ts`
+- Central config for all LLM tasks (prompts, output formats, descriptions)
+- `getTaskConfig(taskName)` returns the config for a given task
+- Source of truth for system prompts — services import from here, not hardcode
+
 **Client:** `apps/api/src/services/llm-client.ts`
 - Uses OpenAI SDK pointed at `LLM_GATEWAY_URL`
 - Single function: `chatCompletion(prompt, { systemPrompt?, model? })` → string

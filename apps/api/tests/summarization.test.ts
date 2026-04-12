@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../src/db/index.js", () => ({ db: {} }));
-vi.mock("../src/services/llm-client.js", () => ({
-  llm: {},
-  chatCompletion: vi.fn(),
+vi.mock("../src/services/llm-executor.js", () => ({
+  llmExecute: vi.fn(),
 }));
 
 import { buildSummaryPrompt, parseSummaryResponse } from "../src/services/summarization.js";

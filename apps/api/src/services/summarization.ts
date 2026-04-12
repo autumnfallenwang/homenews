@@ -1,11 +1,7 @@
 import { eq, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { articles, ranked } from "../db/schema.js";
-import { chatCompletion } from "./llm-client.js";
-
-const SYSTEM_PROMPT = `You are a news article summarizer for an AI/ML/tech news feed.
-Write a concise 2-3 sentence summary of the article that captures the key points.
-Respond ONLY with the summary text, no preamble or formatting.`;
+import { llmExecute } from "./llm-executor.js";
 
 export function buildSummaryPrompt(
   title: string,
@@ -36,8 +32,8 @@ export async function summarizeArticle(
   content: string | null,
 ): Promise<string> {
   const prompt = buildSummaryPrompt(title, summary, content);
-  const response = await chatCompletion(prompt, { systemPrompt: SYSTEM_PROMPT });
-  return parseSummaryResponse(response);
+  const result = await llmExecute("summarization", prompt);
+  return parseSummaryResponse(result.raw);
 }
 
 export async function summarizeUnsummarized(): Promise<{
