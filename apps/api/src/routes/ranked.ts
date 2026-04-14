@@ -1,4 +1,19 @@
-import { desc, eq, gte, sql } from "drizzle-orm";
+import { parseRankedSort, rankedQuerySchema } from "@homenews/shared";
+import {
+  and,
+  arrayOverlaps,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/index.js";
 import { articleAnalysisWithFeed } from "../db/schema.js";
@@ -111,17 +126,161 @@ function toResponse(r: RankedRow) {
   };
 }
 
-// List ranked articles (main feed endpoint)
+// Escape ILIKE wildcards in user search input so literal % / _ / \ don't
+// become pattern metacharacters.
+function escapeIlike(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+type FacetDimension = "sources" | "categories" | "tags";
+
+function buildWhereClause(
+  q: ReturnType<typeof rankedQuerySchema.parse>,
+  compositeExpr: SQL<number>,
+  exclude?: FacetDimension,
+): SQL | undefined {
+  const conds: (SQL | undefined)[] = [];
+
+  if (q.q) {
+    const needle = `%${escapeIlike(q.q)}%`;
+    conds.push(
+      or(
+        ilike(articleAnalysisWithFeed.articleTitle, needle),
+        ilike(articleAnalysisWithFeed.articleSummary, needle),
+        ilike(articleAnalysisWithFeed.llmSummary, needle),
+      ),
+    );
+  }
+  if (q.sources && q.sources.length > 0 && exclude !== "sources") {
+    conds.push(inArray(articleAnalysisWithFeed.feedName, q.sources));
+  }
+  if (q.categories && q.categories.length > 0 && exclude !== "categories") {
+    conds.push(inArray(articleAnalysisWithFeed.feedCategory, q.categories));
+  }
+  if (q.tags && q.tags.length > 0 && exclude !== "tags") {
+    conds.push(arrayOverlaps(articleAnalysisWithFeed.tags, q.tags));
+  }
+  if (q.composite_gte !== undefined) {
+    // composite expression is 0..1 internally; filter input is 0..100 per
+    // decision #2 in phase13-server-filtering-memo.md. Divide at comparison.
+    conds.push(sql`${compositeExpr} >= ${q.composite_gte / 100}`);
+  }
+  if (q.relevance_gte !== undefined) {
+    conds.push(gte(articleAnalysisWithFeed.relevance, q.relevance_gte));
+  }
+  if (q.importance_gte !== undefined) {
+    conds.push(gte(articleAnalysisWithFeed.importance, q.importance_gte));
+  }
+  if (q.published_at_gte !== undefined) {
+    conds.push(gte(articleAnalysisWithFeed.articlePublishedAt, new Date(q.published_at_gte)));
+  }
+  if (q.published_at_lte !== undefined) {
+    conds.push(lte(articleAnalysisWithFeed.articlePublishedAt, new Date(q.published_at_lte)));
+  }
+
+  return conds.length > 0 ? and(...conds) : undefined;
+}
+
+function buildOrderClause(
+  sortRaw: string,
+  compositeExpr: SQL<number>,
+  freshnessExpr: SQL<number>,
+): SQL[] {
+  const { field, direction } = parseRankedSort(sortRaw);
+  // biome-ignore lint/suspicious/noExplicitAny: drizzle desc/asc accept heterogeneous columns+SQL
+  const fieldMap: Record<string, any> = {
+    composite: compositeExpr,
+    relevance: articleAnalysisWithFeed.relevance,
+    importance: articleAnalysisWithFeed.importance,
+    freshness: freshnessExpr,
+    published: articleAnalysisWithFeed.articlePublishedAt,
+    analyzed: articleAnalysisWithFeed.analyzedAt,
+  };
+  const col = fieldMap[field];
+  const primary = direction === "desc" ? desc(col) : asc(col);
+  // Fixed analyzedAt DESC tiebreak; skip when it would be redundant.
+  return field === "analyzed" ? [primary] : [primary, desc(articleAnalysisWithFeed.analyzedAt)];
+}
+
+// --- Facet queries (Phase 13, opt-in via ?include_facets=1) ---
+// Each facet excludes its own dimension from the WHERE clause so that clicking
+// a chip doesn't zero out sibling counts — the user always sees "how many
+// would match if I also added this chip". See phase13-server-filtering-memo.md
+// decision #11.
+
+type FacetBucket = { name: string; count: number };
+
+function fetchSourcesFacet(
+  q: ReturnType<typeof rankedQuerySchema.parse>,
+  compositeExpr: SQL<number>,
+): Promise<FacetBucket[]> {
+  const where = buildWhereClause(q, compositeExpr, "sources");
+  return db
+    .select({
+      name: articleAnalysisWithFeed.feedName,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(articleAnalysisWithFeed)
+    .where(where)
+    .groupBy(articleAnalysisWithFeed.feedName)
+    .orderBy(desc(sql`count(*)`)) as Promise<FacetBucket[]>;
+}
+
+function fetchCategoriesFacet(
+  q: ReturnType<typeof rankedQuerySchema.parse>,
+  compositeExpr: SQL<number>,
+): Promise<FacetBucket[]> {
+  // NULL categories excluded (no "(uncategorized)" bucket — the categories
+  // filter uses exact string match, so uncategorized feeds can't be hit anyway).
+  const base = buildWhereClause(q, compositeExpr, "categories");
+  const where = base
+    ? and(base, isNotNull(articleAnalysisWithFeed.feedCategory))
+    : isNotNull(articleAnalysisWithFeed.feedCategory);
+  return db
+    .select({
+      name: sql<string>`${articleAnalysisWithFeed.feedCategory}`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(articleAnalysisWithFeed)
+    .where(where)
+    .groupBy(articleAnalysisWithFeed.feedCategory)
+    .orderBy(desc(sql`count(*)`)) as Promise<FacetBucket[]>;
+}
+
+function fetchTagsFacet(
+  q: ReturnType<typeof rankedQuerySchema.parse>,
+  compositeExpr: SQL<number>,
+): Promise<FacetBucket[]> {
+  const where = buildWhereClause(q, compositeExpr, "tags");
+  const tagExpr = sql<string>`unnest(${articleAnalysisWithFeed.tags})`;
+  return db
+    .select({
+      name: tagExpr,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(articleAnalysisWithFeed)
+    .where(where)
+    .groupBy(tagExpr)
+    .orderBy(desc(sql`count(*)`)) as Promise<FacetBucket[]>;
+}
+
+// List ranked articles (main feed endpoint) — Phase 13 filter/sort/pagination.
 app.get("/", async (c) => {
-  const limit = Math.min(Number(c.req.query("limit") ?? 20), 100);
-  const offset = Number(c.req.query("offset") ?? 0);
-  const minScore = Number(c.req.query("minScore") ?? 0);
+  const rawParams = Object.fromEntries(new URL(c.req.url).searchParams);
+  const parsed = rankedQuerySchema.safeParse(rawParams);
+  if (!parsed.success) {
+    return c.json({ error: "Invalid query", issues: parsed.error.issues }, 400);
+  }
+  const q = parsed.data;
 
   const s = await loadCompositeSettings();
   const freshnessExpr = buildFreshnessExpr(s.freshness_lambda);
   const compositeExpr = buildCompositeExpr(s);
 
-  const rows = await db
+  const whereClause = buildWhereClause(q, compositeExpr);
+  const orderClause = buildOrderClause(q.sort, compositeExpr, freshnessExpr);
+
+  const listPromise = db
     .select({
       id: articleAnalysisWithFeed.id,
       articleId: articleAnalysisWithFeed.articleId,
@@ -141,12 +300,40 @@ app.get("/", async (c) => {
       compositeScore: compositeExpr,
     })
     .from(articleAnalysisWithFeed)
-    .where(gte(articleAnalysisWithFeed.relevance, minScore))
-    .orderBy(desc(compositeExpr), desc(articleAnalysisWithFeed.analyzedAt))
-    .limit(limit)
-    .offset(offset);
+    .where(whereClause)
+    .orderBy(...orderClause)
+    .limit(q.limit)
+    .offset(q.offset);
 
-  return c.json(rows.map((r) => toResponse(r as RankedRow)));
+  const countPromise = db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(articleAnalysisWithFeed)
+    .where(whereClause);
+
+  if (q.include_facets) {
+    const [rows, countRows, sources, tags, categories] = await Promise.all([
+      listPromise,
+      countPromise,
+      fetchSourcesFacet(q, compositeExpr),
+      fetchTagsFacet(q, compositeExpr),
+      fetchCategoriesFacet(q, compositeExpr),
+    ]);
+    return c.json({
+      rows: rows.map((r) => toResponse(r as RankedRow)),
+      total: Number(countRows[0]?.count ?? 0),
+      limit: q.limit,
+      offset: q.offset,
+      facets: { sources, tags, categories },
+    });
+  }
+
+  const [rows, countRows] = await Promise.all([listPromise, countPromise]);
+  return c.json({
+    rows: rows.map((r) => toResponse(r as RankedRow)),
+    total: Number(countRows[0]?.count ?? 0),
+    limit: q.limit,
+    offset: q.offset,
+  });
 });
 
 // Get single ranked article

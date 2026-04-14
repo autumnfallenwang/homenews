@@ -179,6 +179,95 @@ export type PipelineProgressEvent =
       errorMessage?: string;
     };
 
+// --- Ranked query + response (Phase 13) ---
+// Server-side filtering for GET /ranked. See phase13-server-filtering-memo.md
+// for the full locked design. The query schema runs against URL search params,
+// so numeric/boolean fields use z.coerce and list fields accept comma-separated
+// strings that normalize to string[] | undefined.
+
+export const RANKED_SORT_FIELDS = [
+  "composite",
+  "relevance",
+  "importance",
+  "freshness",
+  "published",
+  "analyzed",
+] as const;
+export type RankedSortField = (typeof RANKED_SORT_FIELDS)[number];
+
+export const rankedSortSchema = z
+  .string()
+  .regex(/^-?(composite|relevance|importance|freshness|published|analyzed)$/, {
+    message: "sort field not recognized; prefix with - for descending",
+  })
+  .default("-composite");
+
+export function parseRankedSort(raw: string): {
+  field: RankedSortField;
+  direction: "asc" | "desc";
+} {
+  const desc = raw.startsWith("-");
+  const field = (desc ? raw.slice(1) : raw) as RankedSortField;
+  return { field, direction: desc ? "desc" : "asc" };
+}
+
+const csvList = z
+  .string()
+  .optional()
+  .transform((v) =>
+    v && v.length > 0
+      ? v
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined,
+  );
+
+export const rankedQuerySchema = z.object({
+  q: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  sources: csvList,
+  categories: csvList,
+  tags: csvList,
+  composite_gte: z.coerce.number().min(0).max(100).optional(),
+  relevance_gte: z.coerce.number().int().min(0).max(100).optional(),
+  importance_gte: z.coerce.number().int().min(0).max(100).optional(),
+  published_at_gte: z.iso.datetime({ offset: true }).optional(),
+  published_at_lte: z.iso.datetime({ offset: true }).optional(),
+  sort: rankedSortSchema,
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).max(10000).default(0),
+  include_facets: z
+    .string()
+    .optional()
+    .transform((v) => v === "1" || v === "true"),
+});
+export type RankedQuery = z.infer<typeof rankedQuerySchema>;
+
+export const rankedFacetSchema = z.object({
+  name: z.string(),
+  count: z.number().int().nonnegative(),
+});
+export type RankedFacet = z.infer<typeof rankedFacetSchema>;
+
+export const rankedFacetsSchema = z.object({
+  sources: z.array(rankedFacetSchema),
+  tags: z.array(rankedFacetSchema),
+  categories: z.array(rankedFacetSchema),
+});
+export type RankedFacets = z.infer<typeof rankedFacetsSchema>;
+
+export const rankedResponseSchema = z.object({
+  rows: z.array(analyzedArticleSchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int(),
+  offset: z.number().int(),
+  facets: rankedFacetsSchema.optional(),
+});
+export type RankedResponse = z.infer<typeof rankedResponseSchema>;
+
 // --- Allowed tag vocabulary (memo Q5) ---
 export const ALLOWED_TAGS = [
   // Topic areas

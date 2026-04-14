@@ -227,3 +227,85 @@
     linear-gradient(90deg, oklch(0.76 0.15 65 / 0.06) 0%, transparent 35%),
     oklch(0.225 0.007 60 / 0.5);
 }
+
+/* Filter bar range slider — hairline track, small amber dot thumb. */
+.filterbar-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: oklch(0.31 0.008 60);
+  outline: none;
+  cursor: pointer;
+}
+.filterbar-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: oklch(0.76 0.15 65);
+  border: none;
+  box-shadow: 0 0 0 3px oklch(0.19 0.006 60);
+  transition: transform 0.15s ease;
+}
+.filterbar-range::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+.filterbar-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: oklch(0.76 0.15 65);
+  border: none;
+  box-shadow: 0 0 0 3px oklch(0.19 0.006 60);
+}
+
+/* Filter bar pending-navigation indicators */
+@keyframes filterbar-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+.filterbar-shimmer-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+.filterbar-shimmer-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.76 0.15 65 / 0.1) 50%,
+    transparent 100%
+  );
+  animation: filterbar-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes filterbar-edge-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.filterbar-edge-pulse::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: oklch(0.76 0.15 65);
+  animation: filterbar-edge-pulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+}

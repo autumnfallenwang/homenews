@@ -4,21 +4,50 @@ import type {
   Feed,
   PipelineRun,
   PipelineStatus,
+  RankedResponse,
   Setting,
   UpdateFeed,
 } from "@homenews/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-export async function fetchRanked(params?: {
+// Phase 13 server-side filter inputs. Mirror of `rankedQuerySchema` in the
+// shared package, one per query param. Snake_case for score/date fields
+// matches the backend schema verbatim; `includeFacets` is the lone camelCase
+// concession because it's a local TS flag, not a URL field.
+export interface RankedFilters {
+  q?: string;
+  sources?: string[];
+  categories?: string[];
+  tags?: string[];
+  composite_gte?: number;
+  relevance_gte?: number;
+  importance_gte?: number;
+  published_at_gte?: string;
+  published_at_lte?: string;
+  sort?: string;
   limit?: number;
   offset?: number;
-  minScore?: number;
-}): Promise<AnalyzedArticle[]> {
+  includeFacets?: boolean;
+}
+
+export async function fetchRanked(filters?: RankedFilters): Promise<RankedResponse> {
   const url = new URL(`${API_URL}/ranked`);
-  if (params?.limit) url.searchParams.set("limit", String(params.limit));
-  if (params?.offset) url.searchParams.set("offset", String(params.offset));
-  if (params?.minScore) url.searchParams.set("minScore", String(params.minScore));
+  const p = url.searchParams;
+  if (filters?.q) p.set("q", filters.q);
+  if (filters?.sources?.length) p.set("sources", filters.sources.join(","));
+  if (filters?.categories?.length) p.set("categories", filters.categories.join(","));
+  if (filters?.tags?.length) p.set("tags", filters.tags.join(","));
+  if (filters?.composite_gte !== undefined) p.set("composite_gte", String(filters.composite_gte));
+  if (filters?.relevance_gte !== undefined) p.set("relevance_gte", String(filters.relevance_gte));
+  if (filters?.importance_gte !== undefined)
+    p.set("importance_gte", String(filters.importance_gte));
+  if (filters?.published_at_gte) p.set("published_at_gte", filters.published_at_gte);
+  if (filters?.published_at_lte) p.set("published_at_lte", filters.published_at_lte);
+  if (filters?.sort) p.set("sort", filters.sort);
+  if (filters?.limit !== undefined) p.set("limit", String(filters.limit));
+  if (filters?.offset !== undefined) p.set("offset", String(filters.offset));
+  if (filters?.includeFacets) p.set("include_facets", "1");
 
   // Always fetch fresh — composite scores depend on live settings that can
   // change between runs, and Next.js's 300s ISR cache was hiding those

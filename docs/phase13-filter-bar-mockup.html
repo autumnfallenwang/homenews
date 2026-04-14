@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>HomeNews · Filter Bar Reference · Phase 13</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --background: oklch(0.19 0.006 60);
+    --foreground: oklch(0.92 0.008 80);
+    --card: oklch(0.225 0.007 60);
+    --card-tint: oklch(0.225 0.007 60 / 0.4);
+    --muted: oklch(0.25 0.008 60);
+    --muted-foreground: oklch(0.66 0.015 70);
+    --subtle-foreground: oklch(0.78 0.012 75);
+    --primary: oklch(0.76 0.15 65);
+    --primary-dim: oklch(0.76 0.15 65 / 0.18);
+    --primary-wash: oklch(0.76 0.15 65 / 0.08);
+    --border: oklch(0.31 0.008 60);
+    --border-strong: oklch(0.38 0.009 60);
+    --destructive: oklch(0.66 0.2 25);
+
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif: "Fraunces", Georgia, "Times New Roman", serif;
+
+    --cap: 0.19em;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--serif);
+    font-optical-sizing: auto;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100vh;
+    padding-bottom: 120px;
+  }
+
+  /* faint paper grain so the warm charcoal doesn't read as flat */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle at 15% 10%, oklch(0.76 0.15 65 / 0.025), transparent 50%),
+      radial-gradient(circle at 85% 80%, oklch(0.76 0.15 65 / 0.018), transparent 55%);
+    z-index: 0;
+  }
+
+  .topnav {
+    position: relative;
+    z-index: 1;
+    height: 44px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    justify-content: space-between;
+    background: oklch(0.19 0.006 60 / 0.9);
+    backdrop-filter: none;
+  }
+  .topnav .brand {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: var(--cap);
+    color: var(--subtle-foreground);
+  }
+  .topnav .brand .mark { color: var(--primary); }
+  .topnav .version {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--muted-foreground);
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1152px;
+    margin: 0 auto;
+    padding: 40px 32px 0;
+  }
+
+  .crumb {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: var(--cap);
+    color: var(--muted-foreground);
+    margin-bottom: 18px;
+  }
+  .crumb .sep { color: var(--border-strong); padding: 0 8px; }
+  .crumb .here { color: var(--foreground); }
+
+  .state-caption {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin: 54px 0 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .state-caption .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--cap);
+    color: var(--primary);
+  }
+  .state-caption .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: var(--cap);
+    color: var(--muted-foreground);
+  }
+  .state-caption .desc {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--subtle-foreground);
+    margin-left: auto;
+  }
+
+  /* ───────── filter bar card ───────── */
+  .filterbar {
+    position: relative;
+    background: var(--card-tint);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .filterbar.loading::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--primary);
+    animation: edgepulse 1.6s ease-in-out infinite;
+  }
+  @keyframes edgepulse {
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 1; }
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+  .row:last-child { border-bottom: none; }
+
+  .row-label {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted-foreground);
+    width: 88px;
+    flex-shrink: 0;
+  }
+
+  /* ── search row ── */
+  .search-row { padding: 18px 22px; }
+  .search {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 1px solid var(--border-strong);
+    padding-bottom: 12px;
+  }
+  .search .q-glyph {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--primary);
+    padding-right: 4px;
+    border-right: 1px solid var(--border);
+    padding-right: 14px;
+  }
+  .search input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--foreground);
+    letter-spacing: -0.005em;
+  }
+  .search input::placeholder {
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .search .clear {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: var(--cap);
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  .search .clear:hover { color: var(--destructive); border-color: var(--destructive); }
+  .search .count-hint {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* ── chip rows ── */
+  .chip-row .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 11px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--subtle-foreground);
+  }
+  .chip .count {
+    font-size: 9.5px;
+    color: var(--muted-foreground);
+    font-weight: 400;
+  }
+  .chip:hover {
+    border-color: var(--border-strong);
+    color: var(--foreground);
+  }
+  .chip.active {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-wash);
+    box-shadow: inset 2px 0 0 0 var(--primary);
+    padding-left: 13px;
+  }
+  .chip.active .count { color: var(--primary); }
+  .chip.overflow {
+    border-color: var(--border);
+    color: var(--muted-foreground);
+    font-weight: 400;
+  }
+
+  /* ── slider row ── */
+  .sliders {
+    display: flex;
+    gap: 36px;
+    flex: 1;
+  }
+  .slider {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+  .slider .slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted-foreground);
+  }
+  .slider .slider-head .val {
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+  .slider.inactive .slider-head .val {
+    color: var(--subtle-foreground);
+    opacity: 0.55;
+  }
+  .track {
+    position: relative;
+    height: 2px;
+    background: var(--border);
+  }
+  .track .fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: var(--primary);
+    transition: width 0.2s ease;
+  }
+  .track .handle {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: var(--primary);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--background);
+    transition: transform 0.15s ease;
+  }
+  .slider:hover .track .handle { transform: translate(-50%, -50%) scale(1.25); }
+  .slider.inactive .track .fill { background: var(--border-strong); }
+  .slider.inactive .track .handle { background: var(--border-strong); }
+
+  /* ── date row ── */
+  .date-row { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .date-row .date-line {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    width: 100%;
+  }
+  .date-field {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    min-width: 168px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--foreground);
+  }
+  .date-field .label {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .date-field.empty .value { color: var(--muted-foreground); font-style: italic; font-family: var(--serif); font-size: 12px; letter-spacing: 0; }
+  .date-field.active { border-color: var(--primary); color: var(--primary); }
+  .date-field.active .label { color: var(--primary); }
+  .date-arrow {
+    font-family: var(--mono);
+    color: var(--muted-foreground);
+    font-size: 12px;
+  }
+  .presets {
+    display: flex;
+    gap: 6px;
+    padding-left: 106px; /* align under date fields (88 label + 18 gap) */
+  }
+  .preset {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted-foreground);
+    padding: 4px 9px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .preset:hover { color: var(--foreground); border-color: var(--border-strong); }
+  .preset.active {
+    color: var(--primary);
+    border-color: var(--primary);
+    background: var(--primary-wash);
+  }
+
+  /* ── sort row ── */
+  .sort-row { justify-content: space-between; }
+  .sort-row .left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .segment {
+    display: inline-flex;
+    border: 1px solid var(--border);
+  }
+  .segment button {
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    padding: 7px 12px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .segment button:last-child { border-right: none; }
+  .segment button:hover { color: var(--foreground); }
+  .segment button.active {
+    background: var(--primary-wash);
+    color: var(--primary);
+    box-shadow: inset 0 -1px 0 0 var(--primary);
+  }
+  .segment button .arrow { font-size: 10px; opacity: 0.85; }
+
+  .reset {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted-foreground);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px 0;
+  }
+  .reset.armed { color: var(--destructive); }
+  .reset:hover { color: var(--destructive); }
+
+  /* ───────── results header ───────── */
+  .results-head {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 22px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .results-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted-foreground);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .results-meta .sep { color: var(--border-strong); }
+  .results-meta .strong { color: var(--foreground); }
+  .results-meta .accent { color: var(--primary); }
+  .results-meta.dimmed { color: var(--muted); opacity: 0.5; }
+  .results-title {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 28px;
+    line-height: 1.1;
+    font-weight: 400;
+    color: var(--foreground);
+    letter-spacing: -0.012em;
+    max-width: 900px;
+  }
+  .results-title .mark { font-style: normal; color: var(--primary); }
+
+  /* ───────── article rows ───────── */
+  .articles { padding: 4px 22px 0; }
+  .article {
+    display: grid;
+    grid-template-columns: 62px 1fr auto;
+    gap: 22px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .article:last-child { border-bottom: none; }
+  .score {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--primary);
+    letter-spacing: -0.02em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .score .of {
+    display: block;
+    font-size: 8.5px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    margin-top: 3px;
+  }
+  .article .body { min-width: 0; }
+  .article .meta-top {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted-foreground);
+    margin-bottom: 6px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .article .meta-top .feed { color: var(--subtle-foreground); }
+  .article .meta-top .cat {
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    color: var(--muted-foreground);
+  }
+  .article .title {
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--foreground);
+    letter-spacing: -0.008em;
+    margin: 0 0 6px;
+  }
+  .article .summary {
+    font-family: var(--serif);
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--subtle-foreground);
+    margin: 0 0 8px;
+    max-width: 720px;
+  }
+  .article .taglist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .article .tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted-foreground);
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+  }
+  .article .tag.hit {
+    color: var(--primary);
+    border-color: var(--primary);
+    background: var(--primary-wash);
+  }
+  .article .subscores {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 3px 14px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted-foreground);
+    align-self: start;
+    padding-top: 4px;
+    text-align: right;
+  }
+  .article .subscores .k { color: var(--muted-foreground); }
+  .article .subscores .v {
+    color: var(--subtle-foreground);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  /* ── skeleton rows ── */
+  .skel {
+    display: grid;
+    grid-template-columns: 62px 1fr auto;
+    gap: 22px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .skel:last-child { border-bottom: none; }
+  .skel .bar {
+    position: relative;
+    background: var(--muted);
+    height: 10px;
+    overflow: hidden;
+  }
+  .skel .bar.tall { height: 16px; }
+  .skel .bar.short { width: 40%; }
+  .skel .bar.med   { width: 72%; }
+  .skel .bar.long  { width: 92%; }
+  .skel .bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(0.76 0.15 65 / 0.0) 20%,
+      oklch(0.76 0.15 65 / 0.18) 50%,
+      oklch(0.76 0.15 65 / 0.0) 80%,
+      transparent 100%
+    );
+    animation: shimmer 1.4s ease-in-out infinite;
+    transform: translateX(-100%);
+  }
+  @keyframes shimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  .skel .lines {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .skel .score-skel {
+    width: 44px;
+    height: 22px;
+    margin-left: auto;
+    background: var(--muted);
+    position: relative;
+    overflow: hidden;
+  }
+  .skel .score-skel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(0.76 0.15 65 / 0.2) 50%,
+      transparent 100%
+    );
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  .skel .sub-skel {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-end;
+  }
+  .skel .sub-skel .bar { width: 80px; height: 8px; }
+
+  /* ── pagination ── */
+  .pager {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 22px 22px 24px;
+    border-top: 1px solid var(--border);
+  }
+  .pager .nav {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 7px 14px;
+  }
+  .pager .nav:hover { color: var(--foreground); border-color: var(--border-strong); }
+  .pager .nav.disabled { opacity: 0.35; cursor: default; }
+  .pager .center {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted-foreground);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .pager .center .current {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 20px;
+    letter-spacing: 0;
+    color: var(--primary);
+    text-transform: none;
+  }
+
+  /* ── responsive ── */
+  @media (max-width: 768px) {
+    .page { padding: 28px 18px 0; }
+    .row { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 16px; }
+    .row-label { width: auto; }
+    .sliders { flex-direction: column; gap: 18px; width: 100%; }
+    .sort-row { flex-direction: column; align-items: flex-start; gap: 14px; }
+    .segment { flex-wrap: wrap; }
+    .presets { padding-left: 0; }
+    .article { grid-template-columns: 46px 1fr; }
+    .article .subscores { grid-column: 1 / -1; justify-self: start; text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topnav">
+  <div class="brand"><span class="mark">●</span>&nbsp;&nbsp;HOMENEWS&nbsp;&nbsp;·&nbsp;&nbsp;NEWSROOM WORKSTATION</div>
+  <div class="version">v0.5 · phase 13 ref</div>
+</header>
+
+<main class="page">
+  <div class="crumb">
+    DASHBOARD <span class="sep">/</span> <span class="here">FILTER BAR REFERENCE</span> <span class="sep">/</span> 2026-04-14
+  </div>
+
+  <!-- ═══════════════════════ STATE A · EMPTY ═══════════════════════ -->
+  <div class="state-caption">
+    <span class="tag">A</span>
+    <span class="label">EMPTY · default landing</span>
+    <span class="desc">no filters, 50 rows, sort by composite</span>
+  </div>
+
+  <section class="filterbar">
+
+    <!-- search -->
+    <div class="row search-row">
+      <div class="search">
+        <span class="q-glyph">Q</span>
+        <input type="text" placeholder="Search headlines, summaries, analysis…" />
+        <span class="count-hint">487 INDEXED</span>
+      </div>
+    </div>
+
+    <!-- sources -->
+    <div class="row chip-row">
+      <div class="row-label">Sources</div>
+      <div class="chips">
+        <button class="chip">Anthropic <span class="count">(14)</span></button>
+        <button class="chip">DeepMind <span class="count">(9)</span></button>
+        <button class="chip">OpenAI <span class="count">(11)</span></button>
+        <button class="chip">Meta AI <span class="count">(6)</span></button>
+        <button class="chip">NVIDIA Dev <span class="count">(22)</span></button>
+        <button class="chip">Microsoft Research <span class="count">(4)</span></button>
+        <button class="chip">Mistral <span class="count">(3)</span></button>
+        <button class="chip">Google AI <span class="count">(7)</span></button>
+        <button class="chip">arXiv cs.AI <span class="count">(615)</span></button>
+        <button class="chip">Hugging Face <span class="count">(18)</span></button>
+        <button class="chip overflow">+4 more</button>
+      </div>
+    </div>
+
+    <!-- categories -->
+    <div class="row chip-row">
+      <div class="row-label">Category</div>
+      <div class="chips">
+        <button class="chip">Lab <span class="count">(62)</span></button>
+        <button class="chip">Lab proxy <span class="count">(41)</span></button>
+        <button class="chip">Research <span class="count">(1 181)</span></button>
+        <button class="chip">News aggregator <span class="count">(24)</span></button>
+      </div>
+    </div>
+
+    <!-- tags -->
+    <div class="row chip-row">
+      <div class="row-label">Tags</div>
+      <div class="chips">
+        <button class="chip">ai-safety <span class="count">(32)</span></button>
+        <button class="chip">model-release <span class="count">(19)</span></button>
+        <button class="chip">alignment <span class="count">(27)</span></button>
+        <button class="chip">benchmark <span class="count">(44)</span></button>
+        <button class="chip">agents <span class="count">(38)</span></button>
+        <button class="chip">multimodal <span class="count">(21)</span></button>
+        <button class="chip">reasoning <span class="count">(29)</span></button>
+        <button class="chip">robotics <span class="count">(12)</span></button>
+        <button class="chip overflow">+31 more</button>
+      </div>
+    </div>
+
+    <!-- sliders -->
+    <div class="row">
+      <div class="row-label">Thresholds</div>
+      <div class="sliders">
+        <div class="slider inactive">
+          <div class="slider-head"><span>Composite ≥</span><span class="val">0</span></div>
+          <div class="track"><div class="fill" style="width:0%"></div><div class="handle" style="left:0%"></div></div>
+        </div>
+        <div class="slider inactive">
+          <div class="slider-head"><span>Relevance ≥</span><span class="val">0</span></div>
+          <div class="track"><div class="fill" style="width:0%"></div><div class="handle" style="left:0%"></div></div>
+        </div>
+        <div class="slider inactive">
+          <div class="slider-head"><span>Importance ≥</span><span class="val">0</span></div>
+          <div class="track"><div class="fill" style="width:0%"></div><div class="handle" style="left:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- dates -->
+    <div class="row date-row">
+      <div class="date-line">
+        <div class="row-label">Published</div>
+        <div class="date-field empty"><span class="label">From</span><span class="value">Any</span></div>
+        <span class="date-arrow">→</span>
+        <div class="date-field empty"><span class="label">To</span><span class="value">Any</span></div>
+      </div>
+      <div class="presets">
+        <button class="preset">Last 24h</button>
+        <button class="preset">Last 7d</button>
+        <button class="preset">Last 30d</button>
+        <button class="preset">All time</button>
+      </div>
+    </div>
+
+    <!-- sort + reset -->
+    <div class="row sort-row">
+      <div class="left">
+        <div class="row-label" style="width:auto">Sort by</div>
+        <div class="segment">
+          <button class="active">Composite <span class="arrow">↓</span></button>
+          <button>Relevance <span class="arrow">↓</span></button>
+          <button>Importance <span class="arrow">↓</span></button>
+          <button>Freshness <span class="arrow">↓</span></button>
+          <button>Published <span class="arrow">↓</span></button>
+          <button>Analyzed <span class="arrow">↓</span></button>
+        </div>
+      </div>
+      <button class="reset">× Reset all</button>
+    </div>
+  </section>
+
+  <!-- results header -->
+  <div class="results-head">
+    <div class="results-meta">
+      <span class="strong">SHOWING 50</span>
+      <span class="sep">/</span>
+      <span>OF 487</span>
+      <span class="sep">·</span>
+      <span>NO FILTERS</span>
+      <span class="sep">·</span>
+      <span>QUERY <span class="accent">11MS</span></span>
+    </div>
+    <h2 class="results-title">The day in <span class="mark">AI</span>.</h2>
+  </div>
+
+  <!-- article rows -->
+  <div class="articles">
+
+    <article class="article">
+      <div class="score">87<span class="of">/ 100</span></div>
+      <div class="body">
+        <div class="meta-top">
+          <span class="feed">Anthropic</span>
+          <span class="cat">Lab</span>
+          <span>2h ago</span>
+          <span>·</span>
+          <span>5 MIN READ</span>
+        </div>
+        <h3 class="title">Scaling Managed Agents: Decoupling the brain from the hands.</h3>
+        <p class="summary">Anthropic's research team explores a separation of agent cognition and tool execution that lets a single reasoning core supervise many parallel actuators — with safety implications for long-horizon tasks.</p>
+        <div class="taglist">
+          <span class="tag">agents</span>
+          <span class="tag">ai-safety</span>
+          <span class="tag">alignment</span>
+          <span class="tag">tool-use</span>
+        </div>
+      </div>
+      <div class="subscores">
+        <span class="k">Rel</span><span class="v">94</span>
+        <span class="k">Imp</span><span class="v">82</span>
+        <span class="k">Fresh</span><span class="v">98</span>
+        <span class="k">Auth</span><span class="v">85</span>
+      </div>
+    </article>
+
+    <article class="article">
+      <div class="score">81<span class="of">/ 100</span></div>
+      <div class="body">
+        <div class="meta-top">
+          <span class="feed">DeepMind</span>
+          <span class="cat">Lab</span>
+          <span>5h ago</span>
+          <span>·</span>
+          <span>8 MIN READ</span>
+        </div>
+        <h3 class="title">Gemini on-device: A 3B model that matches last year's flagship at the edge.</h3>
+        <p class="summary">A new distillation pipeline plus a latency-aware quantization scheme brings flagship-grade reasoning to mobile-class hardware — benchmarks cover MMLU-Pro, GPQA, and a new private eval suite.</p>
+        <div class="taglist">
+          <span class="tag">model-release</span>
+          <span class="tag">benchmark</span>
+          <span class="tag">distillation</span>
+          <span class="tag">on-device</span>
+        </div>
+      </div>
+      <div class="subscores">
+        <span class="k">Rel</span><span class="v">88</span>
+        <span class="k">Imp</span><span class="v">76</span>
+        <span class="k">Fresh</span><span class="v">94</span>
+        <span class="k">Auth</span><span class="v">80</span>
+      </div>
+    </article>
+
+    <article class="article">
+      <div class="score">74<span class="of">/ 100</span></div>
+      <div class="body">
+        <div class="meta-top">
+          <span class="feed">NVIDIA Developer</span>
+          <span class="cat">Lab</span>
+          <span>9h ago</span>
+          <span>·</span>
+          <span>6 MIN READ</span>
+        </div>
+        <h3 class="title">Ising-inspired workflows for building fault-tolerant quantum systems.</h3>
+        <p class="summary">NVIDIA introduces an AI-assisted orchestration layer for quantum error correction that couples a classical GPU control plane to a superconducting qubit array, claiming a 14× reduction in correction latency.</p>
+        <div class="taglist">
+          <span class="tag">quantum</span>
+          <span class="tag">hardware</span>
+          <span class="tag">tooling</span>
+        </div>
+      </div>
+      <div class="subscores">
+        <span class="k">Rel</span><span class="v">78</span>
+        <span class="k">Imp</span><span class="v">71</span>
+        <span class="k">Fresh</span><span class="v">92</span>
+        <span class="k">Auth</span><span class="v">60</span>
+      </div>
+    </article>
+
+  </div>
+
+  <!-- pager -->
+  <div class="pager">
+    <button class="nav disabled">‹ Prev</button>
+    <div class="center">
+      Page <span class="current">1</span> of 10
+    </div>
+    <button class="nav">Next ›</button>
+  </div>
+
+
+  <!-- ═══════════════════════ STATE B · ACTIVE ═══════════════════════ -->
+  <div class="state-caption">
+    <span class="tag">B</span>
+    <span class="label">ACTIVE · query narrowed to 12 rows</span>
+    <span class="desc">search, 2 sources, 1 category, 2 tags, 2 thresholds, last 7d</span>
+  </div>
+
+  <section class="filterbar">
+
+    <div class="row search-row">
+      <div class="search">
+        <span class="q-glyph">Q</span>
+        <input type="text" value="claude safety" />
+        <button class="clear">× Clear</button>
+        <span class="count-hint">MATCH: TITLE · SUMMARY · ANALYSIS</span>
+      </div>
+    </div>
+
+    <div class="row chip-row">
+      <div class="row-label">Sources</div>
+      <div class="chips">
+        <button class="chip active">Anthropic <span class="count">(14)</span></button>
+        <button class="chip active">DeepMind <span class="count">(9)</span></button>
+        <button class="chip">OpenAI <span class="count">(11)</span></button>
+        <button class="chip">Meta AI <span class="count">(6)</span></button>
+        <button class="chip">NVIDIA Dev <span class="count">(22)</span></button>
+        <button class="chip">Microsoft Research <span class="count">(4)</span></button>
+        <button class="chip">Mistral <span class="count">(3)</span></button>
+        <button class="chip">Google AI <span class="count">(7)</span></button>
+        <button class="chip">arXiv cs.AI <span class="count">(615)</span></button>
+        <button class="chip">Hugging Face <span class="count">(18)</span></button>
+        <button class="chip overflow">+4 more</button>
+      </div>
+    </div>
+
+    <div class="row chip-row">
+      <div class="row-label">Category</div>
+      <div class="chips">
+        <button class="chip active">Lab <span class="count">(62)</span></button>
+        <button class="chip">Lab proxy <span class="count">(41)</span></button>
+        <button class="chip">Research <span class="count">(1 181)</span></button>
+        <button class="chip">News aggregator <span class="count">(24)</span></button>
+      </div>
+    </div>
+
+    <div class="row chip-row">
+      <div class="row-label">Tags</div>
+      <div class="chips">
+        <button class="chip active">ai-safety <span class="count">(32)</span></button>
+        <button class="chip active">model-release <span class="count">(19)</span></button>
+        <button class="chip">alignment <span class="count">(27)</span></button>
+        <button class="chip">benchmark <span class="count">(44)</span></button>
+        <button class="chip">agents <span class="count">(38)</span></button>
+        <button class="chip">multimodal <span class="count">(21)</span></button>
+        <button class="chip">reasoning <span class="count">(29)</span></button>
+        <button class="chip">robotics <span class="count">(12)</span></button>
+        <button class="chip overflow">+31 more</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-label">Thresholds</div>
+      <div class="sliders">
+        <div class="slider">
+          <div class="slider-head"><span>Composite ≥</span><span class="val">60</span></div>
+          <div class="track"><div class="fill" style="width:60%"></div><div class="handle" style="left:60%"></div></div>
+        </div>
+        <div class="slider">
+          <div class="slider-head"><span>Relevance ≥</span><span class="val">70</span></div>
+          <div class="track"><div class="fill" style="width:70%"></div><div class="handle" style="left:70%"></div></div>
+        </div>
+        <div class="slider inactive">
+          <div class="slider-head"><span>Importance ≥</span><span class="val">0</span></div>
+          <div class="track"><div class="fill" style="width:0%"></div><div class="handle" style="left:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row date-row">
+      <div class="date-line">
+        <div class="row-label">Published</div>
+        <div class="date-field active"><span class="label">From</span><span class="value">2026-04-08</span></div>
+        <span class="date-arrow">→</span>
+        <div class="date-field active"><span class="label">To</span><span class="value">Now</span></div>
+      </div>
+      <div class="presets">
+        <button class="preset">Last 24h</button>
+        <button class="preset active">Last 7d</button>
+        <button class="preset">Last 30d</button>
+        <button class="preset">All time</button>
+      </div>
+    </div>
+
+    <div class="row sort-row">
+      <div class="left">
+        <div class="row-label" style="width:auto">Sort by</div>
+        <div class="segment">
+          <button>Composite <span class="arrow">↓</span></button>
+          <button class="active">Relevance <span class="arrow">↓</span></button>
+          <button>Importance <span class="arrow">↓</span></button>
+          <button>Freshness <span class="arrow">↓</span></button>
+          <button>Published <span class="arrow">↓</span></button>
+          <button>Analyzed <span class="arrow">↓</span></button>
+        </div>
+      </div>
+      <button class="reset armed">× Reset all · 6 filters</button>
+    </div>
+  </section>
+
+  <div class="results-head">
+    <div class="results-meta">
+      <span class="strong">SHOWING 12</span>
+      <span class="sep">/</span>
+      <span>OF 487</span>
+      <span class="sep">·</span>
+      <span><span class="accent">6 FILTERS</span> ACTIVE</span>
+      <span class="sep">·</span>
+      <span>QUERY <span class="accent">19MS</span></span>
+    </div>
+    <h2 class="results-title">
+      <span class="mark">Claude</span> safety stories, from <span class="mark">Anthropic</span> &amp; <span class="mark">DeepMind</span>, <em>last seven days</em>.
+    </h2>
+  </div>
+
+  <div class="articles">
+
+    <article class="article">
+      <div class="score">92<span class="of">/ 100</span></div>
+      <div class="body">
+        <div class="meta-top">
+          <span class="feed">Anthropic</span>
+          <span class="cat">Lab</span>
+          <span>2026-04-12 · 14:02</span>
+          <span>·</span>
+          <span>11 MIN READ</span>
+        </div>
+        <h3 class="title">Claude Opus 4.6: System card, red-team report, and deployment safeguards.</h3>
+        <p class="summary">A detailed evaluation of Claude Opus 4.6 across ASL-3 protocols, including new oversight benchmarks for long-horizon agentic tasks. Safety classifiers now cover 14 distinct refusal categories; jailbreak rates drop from 4.1% to 0.6% versus 4.5.</p>
+        <div class="taglist">
+          <span class="tag hit">ai-safety</span>
+          <span class="tag hit">model-release</span>
+          <span class="tag">red-teaming</span>
+          <span class="tag">asl-3</span>
+          <span class="tag">claude</span>
+        </div>
+      </div>
+      <div class="subscores">
+        <span class="k">Rel</span><span class="v">98</span>
+        <span class="k">Imp</span><span class="v">91</span>
+        <span class="k">Fresh</span><span class="v">96</span>
+        <span class="k">Auth</span><span class="v">85</span>
+      </div>
+    </article>
+
+    <article class="article">
+      <div class="score">84<span class="of">/ 100</span></div>
+      <div class="body">
+        <div class="meta-top">
+          <span class="feed">DeepMind</span>
+          <span class="cat">Lab</span>
+          <span>2026-04-10 · 09:30</span>
+          <span>·</span>
+          <span>7 MIN READ</span>
+        </div>
+        <h3 class="title">Constitutional oversight for long-horizon agents: lessons from co-training with Claude.</h3>
+        <p class="summary">Joint research with Anthropic on a shared oversight protocol for agentic systems. The paper compares process-level supervision against outcome-level reward modelling on a suite of 2000+ hour-long tool-use trajectories.</p>
+        <div class="taglist">
+          <span class="tag hit">ai-safety</span>
+          <span class="tag">alignment</span>
+          <span class="tag">agents</span>
+          <span class="tag">rlhf</span>
+        </div>
+      </div>
+      <div class="subscores">
+        <span class="k">Rel</span><span class="v">90</span>
+        <span class="k">Imp</span><span class="v">78</span>
+        <span class="k">Fresh</span><span class="v">88</span>
+        <span class="k">Auth</span><span class="v">80</span>
+      </div>
+    </article>
+
+  </div>
+
+  <div class="pager">
+    <button class="nav disabled">‹ Prev</button>
+    <div class="center">
+      Page <span class="current">1</span> of 2
+    </div>
+    <button class="nav">Next ›</button>
+  </div>
+
+
+  <!-- ═══════════════════════ STATE C · LOADING ═══════════════════════ -->
+  <div class="state-caption">
+    <span class="tag">C</span>
+    <span class="label">LOADING · fetch in flight, ~18ms</span>
+    <span class="desc">filters locked, rows shimmering, edge pulsing amber</span>
+  </div>
+
+  <section class="filterbar loading">
+
+    <div class="row search-row">
+      <div class="search">
+        <span class="q-glyph">Q</span>
+        <input type="text" value="claude safety" />
+        <button class="clear">× Clear</button>
+        <span class="count-hint">FETCHING…</span>
+      </div>
+    </div>
+
+    <div class="row chip-row">
+      <div class="row-label">Sources</div>
+      <div class="chips">
+        <button class="chip active">Anthropic <span class="count">(14)</span></button>
+        <button class="chip active">DeepMind <span class="count">(9)</span></button>
+        <button class="chip">OpenAI <span class="count">(11)</span></button>
+        <button class="chip">Meta AI <span class="count">(6)</span></button>
+        <button class="chip">NVIDIA Dev <span class="count">(22)</span></button>
+        <button class="chip">Microsoft Research <span class="count">(4)</span></button>
+        <button class="chip">Mistral <span class="count">(3)</span></button>
+        <button class="chip">Google AI <span class="count">(7)</span></button>
+        <button class="chip overflow">+6 more</button>
+      </div>
+    </div>
+
+    <div class="row chip-row">
+      <div class="row-label">Category</div>
+      <div class="chips">
+        <button class="chip active">Lab <span class="count">(62)</span></button>
+        <button class="chip">Lab proxy <span class="count">(41)</span></button>
+        <button class="chip">Research <span class="count">(1 181)</span></button>
+        <button class="chip">News aggregator <span class="count">(24)</span></button>
+      </div>
+    </div>
+
+    <div class="row chip-row">
+      <div class="row-label">Tags</div>
+      <div class="chips">
+        <button class="chip active">ai-safety <span class="count">(32)</span></button>
+        <button class="chip active">model-release <span class="count">(19)</span></button>
+        <button class="chip">alignment <span class="count">(27)</span></button>
+        <button class="chip">benchmark <span class="count">(44)</span></button>
+        <button class="chip">agents <span class="count">(38)</span></button>
+        <button class="chip">reasoning <span class="count">(29)</span></button>
+        <button class="chip overflow">+33 more</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-label">Thresholds</div>
+      <div class="sliders">
+        <div class="slider">
+          <div class="slider-head"><span>Composite ≥</span><span class="val">60</span></div>
+          <div class="track"><div class="fill" style="width:60%"></div><div class="handle" style="left:60%"></div></div>
+        </div>
+        <div class="slider">
+          <div class="slider-head"><span>Relevance ≥</span><span class="val">70</span></div>
+          <div class="track"><div class="fill" style="width:70%"></div><div class="handle" style="left:70%"></div></div>
+        </div>
+        <div class="slider inactive">
+          <div class="slider-head"><span>Importance ≥</span><span class="val">0</span></div>
+          <div class="track"><div class="fill" style="width:0%"></div><div class="handle" style="left:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row date-row">
+      <div class="date-line">
+        <div class="row-label">Published</div>
+        <div class="date-field active"><span class="label">From</span><span class="value">2026-04-08</span></div>
+        <span class="date-arrow">→</span>
+        <div class="date-field active"><span class="label">To</span><span class="value">Now</span></div>
+      </div>
+      <div class="presets">
+        <button class="preset">Last 24h</button>
+        <button class="preset active">Last 7d</button>
+        <button class="preset">Last 30d</button>
+        <button class="preset">All time</button>
+      </div>
+    </div>
+
+    <div class="row sort-row">
+      <div class="left">
+        <div class="row-label" style="width:auto">Sort by</div>
+        <div class="segment">
+          <button>Composite <span class="arrow">↓</span></button>
+          <button class="active">Relevance <span class="arrow">↓</span></button>
+          <button>Importance <span class="arrow">↓</span></button>
+          <button>Freshness <span class="arrow">↓</span></button>
+          <button>Published <span class="arrow">↓</span></button>
+          <button>Analyzed <span class="arrow">↓</span></button>
+        </div>
+      </div>
+      <button class="reset armed">× Reset all · 6 filters</button>
+    </div>
+  </section>
+
+  <div class="results-head">
+    <div class="results-meta dimmed">
+      SHOWING — &nbsp;·&nbsp; OF 487 &nbsp;·&nbsp; 6 FILTERS ACTIVE &nbsp;·&nbsp; QUERY — MS
+    </div>
+    <h2 class="results-title" style="opacity:.55">
+      <span class="mark">Claude</span> safety stories, from <span class="mark">Anthropic</span> &amp; <span class="mark">DeepMind</span>, <em>last seven days</em>.
+    </h2>
+  </div>
+
+  <div class="articles">
+
+    <div class="skel">
+      <div class="score-skel"></div>
+      <div class="lines">
+        <div class="bar short"></div>
+        <div class="bar tall long"></div>
+        <div class="bar med"></div>
+        <div class="bar short"></div>
+      </div>
+      <div class="sub-skel">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+    </div>
+
+    <div class="skel">
+      <div class="score-skel"></div>
+      <div class="lines">
+        <div class="bar short"></div>
+        <div class="bar tall med"></div>
+        <div class="bar long"></div>
+        <div class="bar short"></div>
+      </div>
+      <div class="sub-skel">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+    </div>
+
+    <div class="skel">
+      <div class="score-skel"></div>
+      <div class="lines">
+        <div class="bar short"></div>
+        <div class="bar tall long"></div>
+        <div class="bar med"></div>
+      </div>
+      <div class="sub-skel">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="pager">
+    <button class="nav disabled">‹ Prev</button>
+    <div class="center">
+      Page <span class="current">—</span> of —
+    </div>
+    <button class="nav disabled">Next ›</button>
+  </div>
+
+</main>
+
+</body>
+</html>
