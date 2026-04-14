@@ -461,11 +461,166 @@ function SchedulerSection(props: PaneProps) {
   return (
     <div className="space-y-5">
       <BooleanRow settingKey="scheduler_enabled" {...props} />
-      <StringRow settingKey="fetch_interval" {...props} />
+      <FetchIntervalRow {...props} />
       <BooleanRow settingKey="analyze_enabled" {...props} />
       <NumberRow settingKey="analyze_batch_size" {...props} min={1} step={10} />
       <BooleanRow settingKey="summarize_enabled" {...props} />
       <NumberRow settingKey="summarize_batch_size" {...props} min={1} step={10} />
+    </div>
+  );
+}
+
+// --- Fetch interval (simple / cron toggle) ---
+
+type IntervalUnit = "minutes" | "hours";
+
+interface ParsedInterval {
+  unit: IntervalUnit;
+  every: number;
+}
+
+/** Parse a cron string into a simple every-N-minutes/hours shape. Returns
+ *  null when the expression can't be expressed that simply (user must use
+ *  advanced mode). */
+function parseCronToSimple(cron: string): ParsedInterval | null {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return null;
+  const [minute, hour, dom, month, dow] = parts;
+  if (dom !== "*" || month !== "*" || dow !== "*") return null;
+
+  // every N minutes: */N * * * *
+  const minMatch = minute.match(/^\*\/(\d+)$/);
+  if (minMatch && hour === "*") {
+    const n = Number.parseInt(minMatch[1], 10);
+    if (n >= 1 && n <= 59) return { unit: "minutes", every: n };
+  }
+  // every N hours at minute 0: 0 */N * * *
+  const hourMatch = hour.match(/^\*\/(\d+)$/);
+  if (hourMatch && minute === "0") {
+    const n = Number.parseInt(hourMatch[1], 10);
+    if (n >= 1 && n <= 23) return { unit: "hours", every: n };
+  }
+  // hourly: 0 * * * *
+  if (minute === "0" && hour === "*") {
+    return { unit: "hours", every: 1 };
+  }
+  return null;
+}
+
+function simpleToCron({ unit, every }: ParsedInterval): string {
+  if (unit === "minutes") {
+    return `*/${every} * * * *`;
+  }
+  if (every === 1) return "0 * * * *";
+  return `0 */${every} * * *`;
+}
+
+function FetchIntervalRow(props: PaneProps) {
+  const { getValue, setLocal, getDescription, isDirty } = props;
+  const settingKey = "fetch_interval";
+  const current = getValue<string>(settingKey, "*/30 * * * *");
+  const parsed = parseCronToSimple(current);
+
+  // Mode is purely local UI state. If the stored cron can't be parsed as a
+  // simple expression, force advanced mode.
+  const [mode, setMode] = useState<"simple" | "cron">(parsed ? "simple" : "cron");
+  // If the saved value becomes unparseable (e.g. user typed a custom cron
+  // then re-opened), snap the toggle to advanced.
+  if (mode === "simple" && !parsed) {
+    // Don't call setMode during render; defer via a flag.
+    queueMicrotask(() => setMode("cron"));
+  }
+
+  const simple: ParsedInterval = parsed ?? { unit: "minutes", every: 30 };
+
+  function updateSimple(next: Partial<ParsedInterval>) {
+    const merged: ParsedInterval = { ...simple, ...next };
+    // Clamp
+    if (merged.unit === "minutes") {
+      merged.every = Math.max(1, Math.min(59, merged.every));
+    } else {
+      merged.every = Math.max(1, Math.min(23, merged.every));
+    }
+    setLocal(settingKey, simpleToCron(merged));
+  }
+
+  return (
+    <FieldShell settingKey={settingKey} getDescription={getDescription} isDirty={isDirty}>
+      <div className="space-y-2">
+        <ModeToggle value={mode} onChange={setMode} />
+        {mode === "simple" ? (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              Every
+            </span>
+            <Input
+              type="number"
+              min={1}
+              max={simple.unit === "minutes" ? 59 : 23}
+              step={1}
+              value={simple.every}
+              onChange={(e) => {
+                const n = Number.parseInt(e.target.value, 10);
+                if (Number.isFinite(n)) updateSimple({ every: n });
+              }}
+              className="h-9 w-20 font-mono text-[12px]"
+            />
+            <select
+              value={simple.unit}
+              onChange={(e) => updateSimple({ unit: e.target.value as IntervalUnit })}
+              className="h-9 rounded-sm border border-border bg-card/30 px-2 font-mono text-[11px] uppercase tracking-[0.12em] text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+            </select>
+          </div>
+        ) : (
+          <Input
+            id={settingKey}
+            type="text"
+            value={current}
+            onChange={(e) => setLocal(settingKey, e.target.value)}
+            placeholder="*/30 * * * *"
+            className="h-9 font-mono text-[12px]"
+          />
+        )}
+        <p className="font-mono text-[10px] text-muted-foreground/70">
+          Resolved cron: <span className="text-muted-foreground">{current}</span>
+        </p>
+      </div>
+    </FieldShell>
+  );
+}
+
+function ModeToggle({
+  value,
+  onChange,
+}: {
+  value: "simple" | "cron";
+  onChange: (v: "simple" | "cron") => void;
+}) {
+  const options: { id: "simple" | "cron"; label: string }[] = [
+    { id: "simple", label: "Simple" },
+    { id: "cron", label: "Cron" },
+  ];
+  return (
+    <div className="inline-flex rounded-sm border border-border bg-card/30 p-0.5">
+      {options.map((opt) => {
+        const active = opt.id === value;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => onChange(opt.id)}
+            className={cn(
+              "rounded-sm px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors",
+              active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

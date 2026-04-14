@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import app from "./app.js";
-import { startScheduler } from "./services/scheduler.js";
+import { applyScheduleFromSettings } from "./services/scheduler.js";
 import { seedDefaults } from "./services/settings.js";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -18,5 +18,5 @@ serve({ fetch: app.fetch, port }, async () => {
       `[settings] Failed to seed defaults on startup: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-  startScheduler(process.env.FETCH_INTERVAL);
+  await applyScheduleFromSettings();
 });

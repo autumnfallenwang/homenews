@@ -75,6 +75,15 @@ See [ui-design-memo.md](ui-design-memo.md) for the design rationale, aesthetic d
 | 35 | Theme setting | Done | `theme` setting key (light/dark/system) in DB, ThemeApplier client component with system-mode media query listener, cookie hydration via SSR layout, Theme tab in settings sidebar with 3-option grid |
 | 36 | Feeds in settings | Done | FeedList moved into `07 FEEDS` tab via `FeedsSection` wrapper, top-nav Feeds link dropped, `/feeds` redirects to `/settings?tab=feeds` |
 
+## Phase 8: Pipeline tuning
+
+Triggered by a diagnostic pass on 2026-04-13 that revealed the analyze queue was starving non-OpenAI feeds and the `/ranked` endpoint was dominated by historical articles. Hotfixes for the acute bugs are tracked in [changelog.md](changelog.md); the entries below are the design-level follow-ups that need decisions before implementation.
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 37 | Historical backfill policy | Not started | Decide retention/cleanup for pre-seed articles (OpenAI goes back to 2015, HF to 2020). Option A: purge unanalyzed rows older than N days. Option B: leave them, rely on analyze-side date filter from hotfix. Needs design memo. |
+| 38 | Ranked recency filter | Not started | `/ranked` currently returns analyzed articles regardless of age. Composite score already has a freshness weight — decide whether to also add a hard `published_at` cutoff at query time, or tune λ instead. Needs design memo. |
+
 ## What's Working
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
@@ -100,7 +109,7 @@ See [ui-design-memo.md](ui-design-memo.md) for the design rationale, aesthetic d
 
 ## What's Next
 
-Phase 7 complete. Next direction TBD — pick up new initiative or polish.
+Phase 7 complete. Pipeline hotfixes landing now (see [changelog.md](changelog.md)); Phase 8 tasks 37–38 need design memos before implementation.
 
 ## Reference Docs
 

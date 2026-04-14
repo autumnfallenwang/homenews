@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS, updateSettingSchema } from "@homenews/shared";
 import { Hono } from "hono";
+import { applyScheduleFromSettings } from "../services/scheduler.js";
 import { getSetting, listSettings, resetSettings, setSetting } from "../services/settings.js";
 
 const app = new Hono();
@@ -57,6 +58,19 @@ app.patch("/:key", async (c) => {
     await setSetting(key, parsed.data.value, undefined, parsed.data.description);
     const value = await getSetting(key);
     const def = DEFAULT_SETTINGS[key];
+
+    // Hot-reload the cron task when the schedule expression changes.
+    // scheduler_enabled is already read per-tick, so no restart needed there.
+    if (key === "fetch_interval") {
+      try {
+        await applyScheduleFromSettings();
+      } catch (err) {
+        console.warn(
+          `[settings] Failed to hot-reload scheduler: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
     return c.json({
       key,
       value,

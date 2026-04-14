@@ -5,11 +5,37 @@ import { getSetting } from "./settings.js";
 import { summarizeUnsummarized } from "./summarize.js";
 
 let task: ScheduledTask | null = null;
+let currentSchedule: string | null = null;
 
-export function startScheduler(cronExpression = "*/30 * * * *"): ScheduledTask {
+const DEFAULT_SCHEDULE = "0 */2 * * *";
+
+/** Read the cron expression from settings, falling back to the hardcoded
+ *  default if the setting is missing or unreadable. */
+async function resolveSchedule(): Promise<string> {
+  try {
+    const fromSettings = await getSetting<string>("fetch_interval");
+    if (typeof fromSettings === "string" && fromSettings.trim().length > 0) {
+      return fromSettings;
+    }
+  } catch {
+    // fall through to default
+  }
+  return DEFAULT_SCHEDULE;
+}
+
+/** Start the scheduler using `fetch_interval` from settings. Safe to call
+ *  again to hot-reload the cron expression after a settings change. */
+export async function applyScheduleFromSettings(): Promise<void> {
+  const next = await resolveSchedule();
+  if (task && currentSchedule === next) return;
+  startScheduler(next);
+}
+
+export function startScheduler(cronExpression: string = DEFAULT_SCHEDULE): ScheduledTask {
   if (task) {
     void task.stop();
   }
+  currentSchedule = cronExpression;
 
   task = schedule(
     cronExpression,
@@ -75,6 +101,7 @@ export function stopScheduler(): void {
   if (task) {
     void task.stop();
     task = null;
+    currentSchedule = null;
     console.info("[scheduler] Stopped");
   }
 }

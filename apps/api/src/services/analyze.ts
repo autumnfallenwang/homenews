@@ -1,8 +1,14 @@
-import { and, eq, isNull, notExists } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, notExists, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { articleAnalysis, articles } from "../db/schema.js";
 import { llmExecute } from "./llm-executor.js";
 import { getSetting } from "./settings.js";
+
+/** Cutoff for which unanalyzed articles the pipeline will even look at.
+ *  Historical backfill (OpenAI goes back to 2015) would otherwise monopolize
+ *  the queue with rows that can never score well on freshness. Anything older
+ *  is ignored by analyze — see Phase 8 / changelog 2026-04-13. */
+const ANALYZE_MAX_AGE_DAYS = 14;
 
 export interface AnalyzeResult {
   relevance: number;
@@ -64,12 +70,23 @@ export async function analyzeArticle(
 export async function analyzeUnanalyzed(
   limit?: number,
 ): Promise<{ analyzed: number; errors: number }> {
+  // Use COALESCE(published_at, fetched_at) as the effective date so feeds that
+  // don't populate published_at still get ordered sensibly.
+  const effectiveDate = sql<Date>`COALESCE(${articles.publishedAt}, ${articles.fetchedAt})`;
+  const cutoff = sql<Date>`NOW() - (${ANALYZE_MAX_AGE_DAYS} || ' days')::interval`;
+
   const baseQuery = db
     .select({ id: articles.id, title: articles.title, summary: articles.summary })
     .from(articles)
     .where(
       and(
         isNull(articles.duplicateOfId),
+        // Only consider articles from the recency window. `or(isNull, gte)`
+        // keeps rows with a NULL published_at (fall back to fetched_at check).
+        or(
+          and(isNull(articles.publishedAt), gte(articles.fetchedAt, cutoff)),
+          gte(articles.publishedAt, cutoff),
+        ),
         notExists(
           db
             .select({ one: articleAnalysis.id })
@@ -77,7 +94,8 @@ export async function analyzeUnanalyzed(
             .where(eq(articleAnalysis.articleId, articles.id)),
         ),
       ),
-    );
+    )
+    .orderBy(desc(effectiveDate));
 
   const unanalyzed = limit && limit > 0 ? await baseQuery.limit(limit) : await baseQuery;
 

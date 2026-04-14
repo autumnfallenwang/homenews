@@ -227,9 +227,9 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
     description: "Master scheduler on/off switch",
   },
   fetch_interval: {
-    value: "*/30 * * * *",
+    value: "0 */2 * * *",
     type: "string",
-    description: "Cron expression for feed fetching",
+    description: "How often the scheduler fetches feeds (cron expression)",
   },
   analyze_enabled: {
     value: true,
