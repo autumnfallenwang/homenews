@@ -191,11 +191,7 @@ export function DashboardFilters({ articles }: { articles: AnalyzedArticle[] }) 
             All
           </ChipButton>
           {sources.map((s) => (
-            <ChipButton
-              key={s}
-              active={selectedSources.has(s)}
-              onClick={() => toggleSource(s)}
-            >
+            <ChipButton key={s} active={selectedSources.has(s)} onClick={() => toggleSource(s)}>
               {s}
             </ChipButton>
           ))}

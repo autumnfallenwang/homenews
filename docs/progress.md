@@ -120,14 +120,14 @@ Triggered by a Phase 9 diagnostic run that analyzed 99/100 articles from arXiv c
 | 55 | Feeds settings UI: add "Analyze weight" column next to "Authority" | Done | `feed-list.tsx`: extended `FeedEdit` with `analyzeWeight?`, added `effectiveAnalyzeWeight()` + `handleAnalyzeWeightChange()` helpers, extended `setEdit()` diff to handle the third field, generalized `AuthorityInput` → `WeightInput` taking an `id` prop so it works for both columns, added new `<TableHead>Analyze</TableHead>` + `<TableCell>` row. Existing dirty-tracking + SaveBar wiring picks it up automatically — `feeds-section.tsx` only imports the `FeedEdit` type and forwards everything via `updateFeed()`. Web build clean, settings page 34.9 → 35.0 kB. |
 | 56 | Changelog entry | Done | 2026-04-14 entries for `feat(analyze)` weighted allocation, `chore(pipeline)` per-feed fetch logging, `feat(feeds-ui)` Analyze column, `feat(shared)` schema extension. Phase 10 closed. |
 
-## Phase 11: Summarize policy
+## Phase 11: Summarize policy (COMPLETE)
 
 Small follow-up to Phase 10. Current `summarizeUnsummarized()` has no `ORDER BY`, no recency filter, and no enabled-feed check. Under sustained overload it processes low-value articles in insertion order while high-relevance items wait. Proposed fix: value-first ordering + 14-day window + enabled filter. Design rationale in [pipeline-flow.md](pipeline-flow.md) Layer 3 and the "value-first, not newest-first" decision explained there.
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 57 | `summarize.ts` query rewrite | Not started | Add `ORDER BY (relevance + importance) DESC, published_at DESC`, 14-day window filter (same as analyze), `feeds.enabled = true`. ~15 lines. No new schema, no new settings, no new tests. |
-| 58 | Changelog entry | Not started | `feat(summarize)` line explaining value-first policy + graceful degradation shape |
+| 57 | `summarize.ts` query rewrite | Done | Added `SUMMARIZE_MAX_AGE_DAYS = 14` constant (same window as analyze). Extended the query with `and(isNull(llmSummary), eq(feeds.enabled, true), inWindow)` and `.orderBy(desc(relevance + importance), desc(publishedAt))`. Value-first priority using SQL `(relevance + importance)` composite, fresher content wins on ties. No per-feed allocation — analyze already distributed state-2 rows fairly. 186 tests still passing. |
+| 58 | Changelog entry | Done | 2026-04-14 `feat(summarize)` entry explaining value-first policy + graceful degradation. |
 
 ## What's Working
 
@@ -154,7 +154,7 @@ Small follow-up to Phase 10. Current `summarizeUnsummarized()` has no `ORDER BY`
 
 ## What's Next
 
-Phase 10 complete. Phase 10.1 follow-up also landed (round-robin iteration fix). Next: **Phase 11** — summarize query rewrite (tasks 57-58). Small, 15 LOC, no schema change. See [pipeline-flow.md](pipeline-flow.md) for the full three-layer design and backlog policy. Still unsolved: Google AI Blog fetch error (next manual run will surface it via the Task 54 per-feed log loop).
+Phases 10-11 complete. All three pipeline layers (fetch / analyze / summarize) now have well-defined pickup policies matching [pipeline-flow.md](pipeline-flow.md). Still unsolved: Google AI Blog fetch error (next manual run will surface it via the Task 54 per-feed log loop). Next direction TBD.
 
 ## Reference Docs
 
