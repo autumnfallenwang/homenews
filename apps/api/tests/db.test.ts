@@ -17,6 +17,7 @@ describe("feeds table", () => {
         "category",
         "enabled",
         "authorityScore",
+        "analyzeWeight",
         "lastFetchedAt",
         "createdAt",
       ].sort(),
@@ -30,6 +31,7 @@ describe("feeds table", () => {
     expect(cols.url.notNull).toBe(true);
     expect(cols.enabled.notNull).toBe(true);
     expect(cols.authorityScore.notNull).toBe(true);
+    expect(cols.analyzeWeight.notNull).toBe(true);
     expect(cols.createdAt.notNull).toBe(true);
   });
 

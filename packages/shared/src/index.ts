@@ -13,6 +13,9 @@ export const feedSchema = z.object({
   category: z.string().nullable(),
   enabled: z.boolean(),
   authorityScore: z.number().min(0).max(1),
+  // Per-feed weight for the analyze batch allocation (Phase 10). Separate
+  // from authorityScore by design — see phase10-analyze-allocation-memo.md.
+  analyzeWeight: z.number().min(0).max(1),
   lastFetchedAt: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -24,6 +27,8 @@ export const createFeedSchema = z.object({
   url: z.url(),
   category: z.string().optional(),
   enabled: z.boolean().optional(),
+  authorityScore: z.number().min(0).max(1).optional(),
+  analyzeWeight: z.number().min(0).max(1).optional(),
 });
 
 export type CreateFeed = z.infer<typeof createFeedSchema>;
@@ -34,6 +39,7 @@ export const updateFeedSchema = z.object({
   category: z.string().nullable().optional(),
   enabled: z.boolean().optional(),
   authorityScore: z.number().min(0).max(1).optional(),
+  analyzeWeight: z.number().min(0).max(1).optional(),
 });
 
 export type UpdateFeed = z.infer<typeof updateFeedSchema>;

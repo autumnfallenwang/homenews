@@ -91,7 +91,7 @@ function ArticleRow({ item }: { item: AnalyzedArticle }) {
 
 export function DashboardFilters({ articles }: { articles: AnalyzedArticle[] }) {
   const [query, setQuery] = useState("");
-  const [activeSource, setActiveSource] = useState<string | null>(null);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("composite");
 
@@ -119,6 +119,15 @@ export function DashboardFilters({ articles }: { articles: AnalyzedArticle[] }) 
     });
   }
 
+  function toggleSource(source: string) {
+    setSelectedSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(source)) next.delete(source);
+      else next.add(source);
+      return next;
+    });
+  }
+
   const filtered = useMemo(() => {
     let result = articles;
     if (query) {
@@ -129,14 +138,14 @@ export function DashboardFilters({ articles }: { articles: AnalyzedArticle[] }) 
           (a.llmSummary ?? a.article.summary ?? "").toLowerCase().includes(q),
       );
     }
-    if (activeSource) {
-      result = result.filter((a) => a.article.feedName === activeSource);
+    if (selectedSources.size > 0) {
+      result = result.filter((a) => selectedSources.has(a.article.feedName));
     }
     if (selectedTags.size > 0) {
       result = result.filter((a) => (a.tags ?? []).some((t) => selectedTags.has(t)));
     }
     return result;
-  }, [articles, query, activeSource, selectedTags]);
+  }, [articles, query, selectedSources, selectedTags]);
 
   const sorted = useMemo(() => {
     function keyValue(a: AnalyzedArticle): number {
@@ -172,23 +181,25 @@ export function DashboardFilters({ articles }: { articles: AnalyzedArticle[] }) 
           <SegmentedSort sortKey={sortKey} onChange={setSortKey} />
         </div>
 
-        {/* Source filter */}
-        {sources.length > 1 && (
-          <FilterRow label="Source">
-            <ChipButton active={activeSource === null} onClick={() => setActiveSource(null)}>
-              All
+        {/* Source filter — multi-select; empty set means "all". Always
+            rendered (even with 0 or 1 source) to keep the UI layout stable. */}
+        <FilterRow label="Source">
+          <ChipButton
+            active={selectedSources.size === 0}
+            onClick={() => setSelectedSources(new Set())}
+          >
+            All
+          </ChipButton>
+          {sources.map((s) => (
+            <ChipButton
+              key={s}
+              active={selectedSources.has(s)}
+              onClick={() => toggleSource(s)}
+            >
+              {s}
             </ChipButton>
-            {sources.map((s) => (
-              <ChipButton
-                key={s}
-                active={activeSource === s}
-                onClick={() => setActiveSource(activeSource === s ? null : s)}
-              >
-                {s}
-              </ChipButton>
-            ))}
-          </FilterRow>
-        )}
+          ))}
+        </FilterRow>
 
         {/* Tag filter */}
         {sortedTags.length > 0 && (

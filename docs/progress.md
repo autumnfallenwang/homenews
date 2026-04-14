@@ -104,7 +104,7 @@ Triggered by the observation that an 8-minute pipeline run leaves the user stari
 | 48 | Tests: `pipeline.test.ts` — cancellation + progress callback + phase boundaries | Done | 4 new tests covering the per-article event threading contract: full 13-event sequence (start + items + done for each phase), async onProgress ordering preservation (with microtask delay), mid-analyze cancel → summarize skipped, mid-summarize cancel → run marked cancelled. 174 passing. Also **fixed a latent bug** in `pipeline.ts`: mid-summarize cancellation used to finalize as `completed` because the orchestrator had no post-Phase-3 cancel check — added one before the final-status transition. Logged in [changelog.md](changelog.md). |
 | 49 | Drop obsolete helpers in `apps/web/src/lib/api.ts` | Done | Removed the 4 old `triggerPipeline*` helpers + their result interfaces. `fetchPipelineStatus` / `fetchPipelineRuns` / `cancelPipelineRun` / `PIPELINE_STREAM_URL` had already landed in Tasks 45-46. Grep confirmed zero callers before deletion. Web build clean, bundle size unchanged (8.86 kB). |
 
-## Phase 10: Analyze allocation
+## Phase 10: Analyze allocation (COMPLETE)
 
 See [phase10-analyze-allocation-memo.md](phase10-analyze-allocation-memo.md) for the full design — "one score one thing" principle, weighted-allocation-with-spillover algorithm, the `analyze_weight` vs `authority_score` separation, and why we are NOT splitting freshness formulas or switching to `fetched_at`.
 
@@ -112,13 +112,22 @@ Triggered by a Phase 9 diagnostic run that analyzed 99/100 articles from arXiv c
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 50 | Schema: add `analyze_weight real NOT NULL DEFAULT 0.5` to `feeds` | Not started | `drizzle-kit push`, update `db.test.ts` columns assertion. |
-| 51 | Shared: extend `feedSchema` / `createFeedSchema` / `updateFeedSchema` with `analyzeWeight` | Not started | Zod `.number().min(0).max(1)`. |
-| 52 | `allocateSlots()` pure function + unit tests in `analyze.test.ts` | Not started | Weighted allocation with spillover. ~6 test cases: equal weights, unequal weights, spillover, zero-weight exclusion, under-budget runs, empty input. |
-| 53 | `analyzeUnanalyzed()` refactor: count → allocate → fetch-per-feed → sort → analyze | Not started | 4-phase execution: 1 GROUP BY count query + N LIMIT queries (N ≤ 14) + in-memory allocation + freshness-desc sort across feeds. |
-| 54 | Per-feed fetch log lines in `pipeline.ts` fetch phase | Not started | Restores Task 44 observability loss. One `[pipeline] fetch:<feedName> added=N` line per feed, `[pipeline] fetch:<feedName> ERROR — <msg>` for failures. Will also surface the still-unknown Google AI Blog error on next run. |
-| 55 | Feeds settings UI: add "Analyze weight" column next to "Authority" | Not started | Inline editable Input, same dirty-tracking pattern as authority_score. |
-| 56 | Changelog entry | Not started | 2026-04-14 block summarizing the fix. |
+| 50 | Schema: add `analyze_weight real NOT NULL DEFAULT 0.5` to `feeds` | Done | Column added to `feeds` pgTable in schema.ts. `drizzle-kit push` applied to dev DB, verified via `\d feeds`. `db.test.ts` columns assertion updated (analyzeWeight in expected list + notNull check). 174 tests still passing. Default 0.5 applied to all 15 existing rows automatically. |
+| 51 | Shared: extend `feedSchema` / `createFeedSchema` / `updateFeedSchema` with `analyzeWeight` | Done | `analyzeWeight: z.number().min(0).max(1)` added to `feedSchema` (required) and to both `createFeedSchema` / `updateFeedSchema` (optional). Also filled a pre-existing gap: `createFeedSchema` now accepts `authorityScore` on create (was previously PATCH-only). `feeds.test.ts` mock fixture updated. 174 tests still passing, web build clean. |
+| 52 | `allocateSlots()` pure function + unit tests in `analyze.test.ts` | Done | Weighted allocation with spillover lives in `analyze.ts` alongside the `FeedAllocation` interface. Pass-snapshot denominator (`passRemaining`) ensures intra-pass fairness; ceiling rounding prevents fractional-share starvation; capped at pending; max 10 spillover passes. **12 unit tests** in `analyze.test.ts` covering empty input, zero/negative slots, single-feed both directions, equal/unequal weights, low-volume spillover, zero-weight exclusion, zero-pending exclusion, under-budget, and a **realistic 12-feed scenario** mirroring today's actual production data — verifies all 12 feeds get representation and arXiv is capped ≤ 20 each. **186 tests passing** (174 → 186). |
+| 53 | `analyzeUnanalyzed()` refactor: count → allocate → fetch-per-feed → sort → analyze | Done | Body of `analyzeUnanalyzed()` rewritten as a 4-phase execution. Phase 1: GROUP BY count query joining `articles` + `feeds` + leftJoin `article_analysis` filtering on enabled+window+not-analyzed. Phase 2: `allocateSlots()` with `Number()` coercion for postgres BIGINT. Allocation summary logged via `[analyze] allocation: feed=N/pending …`. Phase 3: N small per-feed fetch queries with LIMIT slotCount. Phase 3.5: in-JS sort across feeds by `COALESCE(published_at, fetched_at)` desc for ticker interleaving. Phase 4: existing analyze loop unchanged (progress events + cancel signal). **Behavior change**: disabled feeds now also stop analyze (was: only stopped fetch). Dropped `notExists` import (replaced by leftJoin pattern). 186 tests still passing. |
+| 54 | Per-feed fetch log lines in `pipeline.ts` fetch phase | Done | Inserted a per-feed loop after `fetchAllFeeds()` in the fetch phase. One `[pipeline] run <id> fetch:<feedName> added=N` info line per successful feed, `[pipeline] run <id> fetch:<feedName> ERROR — <msg>` warn line per failure. Restores the observability lost when Task 44 deleted the old `admin.ts` per-feed log helper. Next manual run will surface the still-unknown Google AI Blog error in the terminal. |
+| 55 | Feeds settings UI: add "Analyze weight" column next to "Authority" | Done | `feed-list.tsx`: extended `FeedEdit` with `analyzeWeight?`, added `effectiveAnalyzeWeight()` + `handleAnalyzeWeightChange()` helpers, extended `setEdit()` diff to handle the third field, generalized `AuthorityInput` → `WeightInput` taking an `id` prop so it works for both columns, added new `<TableHead>Analyze</TableHead>` + `<TableCell>` row. Existing dirty-tracking + SaveBar wiring picks it up automatically — `feeds-section.tsx` only imports the `FeedEdit` type and forwards everything via `updateFeed()`. Web build clean, settings page 34.9 → 35.0 kB. |
+| 56 | Changelog entry | Done | 2026-04-14 entries for `feat(analyze)` weighted allocation, `chore(pipeline)` per-feed fetch logging, `feat(feeds-ui)` Analyze column, `feat(shared)` schema extension. Phase 10 closed. |
+
+## Phase 11: Summarize policy
+
+Small follow-up to Phase 10. Current `summarizeUnsummarized()` has no `ORDER BY`, no recency filter, and no enabled-feed check. Under sustained overload it processes low-value articles in insertion order while high-relevance items wait. Proposed fix: value-first ordering + 14-day window + enabled filter. Design rationale in [pipeline-flow.md](pipeline-flow.md) Layer 3 and the "value-first, not newest-first" decision explained there.
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 57 | `summarize.ts` query rewrite | Not started | Add `ORDER BY (relevance + importance) DESC, published_at DESC`, 14-day window filter (same as analyze), `feeds.enabled = true`. ~15 lines. No new schema, no new settings, no new tests. |
+| 58 | Changelog entry | Not started | `feat(summarize)` line explaining value-first policy + graceful degradation shape |
 
 ## What's Working
 
@@ -145,7 +154,7 @@ Triggered by a Phase 9 diagnostic run that analyzed 99/100 articles from arXiv c
 
 ## What's Next
 
-Phase 9 complete. Phase 10 planned: analyze allocation fix for the arXiv-starvation symptom observed in the first post-Phase-9 diagnostic run. Full design in [phase10-analyze-allocation-memo.md](phase10-analyze-allocation-memo.md). Next concrete task: **Task 50** — schema migration adding `feeds.analyze_weight`. Implementation order is strict across tasks 50-56 per the memo.
+Phase 10 complete. Phase 10.1 follow-up also landed (round-robin iteration fix). Next: **Phase 11** — summarize query rewrite (tasks 57-58). Small, 15 LOC, no schema change. See [pipeline-flow.md](pipeline-flow.md) for the full three-layer design and backlog policy. Still unsolved: Google AI Blog fetch error (next manual run will surface it via the Task 54 per-feed log loop).
 
 ## Reference Docs
 

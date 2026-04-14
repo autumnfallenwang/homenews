@@ -144,7 +144,7 @@ With those values, sum of weights ≈ 6.85. arXiv collectively baseline ≈ `0.4
 | 1 | Default `analyze_weight` value for new feeds? | 0.5 (consistent with `authority_score`) |
 | 2 | Weight 0 semantics? | "Never analyze this feed" — feed still fetches, just skipped by allocation |
 | 3 | When total pending < batch? | Analyze everything — fairness is about scarcity, not a hard cap |
-| 4 | Sort order within a run? | By freshness desc (interleaved) — better ticker UX |
+| 4 | Sort order within a run? | ~~By freshness desc (interleaved)~~ → **Round-robin across feeds, ordered by weight desc**. Original "by freshness desc" answer was wrong — arXiv's hyper-fresh `published_at` timestamps clustered at the top of any freshness sort, so cancelling mid-run starved lab feeds for the same reason the old broken query did, just one step later. Fixed via round-robin interleaving in Phase 10.1. Within each feed, articles stay newest-first (per-feed query's `ORDER BY`). |
 | 5 | Seed the tuning values or wait? | Wait. Leave 0.5 everywhere, observe one run, tune via UI. |
 | 6 | Show "estimated slots" preview in UI? | Skip — nice-to-have, not blocking |
 | 7 | Does analyze_weight affect scheduler vs manual differently? | No. Same allocation either way. |

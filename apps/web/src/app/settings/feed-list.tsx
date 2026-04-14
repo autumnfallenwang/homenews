@@ -28,6 +28,7 @@ import { createFeed, deleteFeed, triggerFetchFeed } from "@/lib/api";
 export interface FeedEdit {
   enabled?: boolean;
   authorityScore?: number;
+  analyzeWeight?: number;
 }
 
 function formatDate(dateStr: string | null): string {
@@ -63,11 +64,16 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
     return pendingEdits[feed.id]?.authorityScore ?? feed.authorityScore;
   }
 
+  function effectiveAnalyzeWeight(feed: Feed): number {
+    return pendingEdits[feed.id]?.analyzeWeight ?? feed.analyzeWeight;
+  }
+
   function setEdit(feedId: string, patch: FeedEdit, savedFeed: Feed) {
     setPendingEdits((prev) => {
       const existing: FeedEdit = prev[feedId] ?? {};
       const candidateEnabled = patch.enabled ?? existing.enabled;
       const candidateAuthority = patch.authorityScore ?? existing.authorityScore;
+      const candidateAnalyzeWeight = patch.analyzeWeight ?? existing.analyzeWeight;
 
       const cleaned: FeedEdit = {};
       if (candidateEnabled !== undefined && candidateEnabled !== savedFeed.enabled) {
@@ -75,6 +81,12 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
       }
       if (candidateAuthority !== undefined && candidateAuthority !== savedFeed.authorityScore) {
         cleaned.authorityScore = candidateAuthority;
+      }
+      if (
+        candidateAnalyzeWeight !== undefined &&
+        candidateAnalyzeWeight !== savedFeed.analyzeWeight
+      ) {
+        cleaned.analyzeWeight = candidateAnalyzeWeight;
       }
 
       const { [feedId]: _drop, ...rest } = prev;
@@ -89,6 +101,10 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
 
   function handleAuthorityChange(feed: Feed, value: number) {
     setEdit(feed.id, { authorityScore: value }, feed);
+  }
+
+  function handleAnalyzeWeightChange(feed: Feed, value: number) {
+    setEdit(feed.id, { analyzeWeight: value }, feed);
   }
 
   async function handleDelete(feed: Feed) {
@@ -209,6 +225,9 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
               <TableHead>Category</TableHead>
               <TableHead>Enabled</TableHead>
               <TableHead title="Per-feed weight in the composite score (0-1)">Authority</TableHead>
+              <TableHead title="Per-feed share of the analyze batch budget (0 = never analyze)">
+                Analyze
+              </TableHead>
               <TableHead>Last Fetched</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -243,10 +262,17 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
                     />
                   </TableCell>
                   <TableCell>
-                    <AuthorityInput
-                      feed={feed}
+                    <WeightInput
+                      id={`authority-${feed.id}`}
                       value={effectiveAuthority(feed)}
                       onChange={(v) => handleAuthorityChange(feed, v)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <WeightInput
+                      id={`analyze-weight-${feed.id}`}
+                      value={effectiveAnalyzeWeight(feed)}
+                      onChange={(v) => handleAnalyzeWeightChange(feed, v)}
                     />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -284,21 +310,25 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
   );
 }
 
-function AuthorityInput({
-  feed,
+/**
+ * Generic weight input — used by both the Authority and Analyze columns.
+ * Local state shadows the controlled value so the user can type freely;
+ * the value commits on blur, and re-syncs from the prop when the input
+ * loses focus (e.g. after a Cancel-from-SaveBar reset).
+ */
+function WeightInput({
+  id,
   value,
   onChange,
 }: {
-  feed: Feed;
+  id: string;
   value: number;
   onChange: (value: number) => void;
 }) {
   const [local, setLocal] = useState(String(value));
   const currentStr = String(value);
 
-  // Keep local in sync when the effective value changes from outside
-  // (e.g. cancel resets pending edits).
-  if (local !== currentStr && document.activeElement?.id !== `authority-${feed.id}`) {
+  if (local !== currentStr && document.activeElement?.id !== id) {
     setLocal(currentStr);
   }
 
@@ -314,7 +344,7 @@ function AuthorityInput({
 
   return (
     <Input
-      id={`authority-${feed.id}`}
+      id={id}
       type="number"
       min={0}
       max={1}

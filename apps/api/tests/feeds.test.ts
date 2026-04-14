@@ -8,6 +8,7 @@ const mockFeeds = [
     category: "news",
     enabled: true,
     authorityScore: 0.5,
+    analyzeWeight: 0.5,
     lastFetchedAt: null,
     createdAt: new Date("2026-01-01"),
   },

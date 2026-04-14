@@ -19,6 +19,10 @@ export const feeds = pgTable("feeds", {
   category: text("category"),
   enabled: boolean("enabled").notNull().default(true),
   authorityScore: real("authority_score").notNull().default(0.5),
+  // Per-feed weight for the analyze batch allocation. Separate from
+  // authority_score by design: this governs analyze throughput/cost share,
+  // not ranking. 0 = never analyze this feed. See Phase 10 memo.
+  analyzeWeight: real("analyze_weight").notNull().default(0.5),
   lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

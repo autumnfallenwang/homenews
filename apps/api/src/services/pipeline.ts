@@ -173,6 +173,16 @@ export async function runPipelineWithProgress(
       await onProgress?.({ type: "fetch-start" });
       const phaseStart = performance.now();
       const results = await fetchAllFeeds();
+      // Per-feed log lines — restored after Task 44 dropped them. Cheap to
+      // emit and the only way to surface specific feed failures (e.g. the
+      // Google AI Blog rss-parser error). Aggregate counts follow.
+      for (const r of results) {
+        if (r.error) {
+          console.warn(`[pipeline] run ${shortId} fetch:${r.feedName} ERROR — ${r.error}`);
+        } else {
+          console.info(`[pipeline] run ${shortId} fetch:${r.feedName} added=${r.added}`);
+        }
+      }
       fetchAdded = results.reduce((sum, r) => sum + r.added, 0);
       fetchErrors = results.filter((r) => r.error).length;
       console.info(

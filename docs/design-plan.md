@@ -15,15 +15,24 @@ A personal AI news intelligence system. Ingest broadly from RSS and open web sou
 | Validation | Zod (shared schemas) |
 | Database | PostgreSQL + Drizzle ORM |
 | Scheduled Jobs | node-cron (in API process) |
-| LLM | Claude Haiku (filtering, ranking, summarization) |
+| LLM | OpenAI-compatible via local llm-gateway. Per-task model selection via settings (primary + fallback). Codex-series models for analyze, configured per DB settings. |
 
 ## Data Model
 
 ```
-Feed       { id, name, url, category, enabled, lastFetchedAt, createdAt }
-Article    { id, feedId, title, link, summary, content, author, publishedAt, fetchedAt }
-Ranked     { id, articleId, score, tags, cluster, llmSummary, rankedAt }
+Feed              { id, name, url, category, enabled, authorityScore, analyzeWeight,
+                    lastFetchedAt, createdAt }
+Article           { id, feedId, title, link, summary, content, author,
+                    publishedAt, fetchedAt, duplicateOfId }
+ArticleAnalysis   { id, articleId, relevance, importance, tags, llmSummary, analyzedAt }
+Setting           { id, userId, key, value, valueType, description, updatedAt }
+PipelineRun       { id, trigger, status, startedAt, endedAt, durationMs,
+                    fetchAdded, fetchErrors, analyzeAnalyzed, analyzeErrors,
+                    summarizeSummarized, summarizeErrors, errorMessage }
 ```
+
+See [pipeline-flow.md](pipeline-flow.md) for the full state machine and
+per-layer pickup policies.
 
 ## Core Design Principles
 
@@ -102,12 +111,25 @@ See [ui-design-memo.md](ui-design-memo.md) for full design rationale and decisio
 35. Theme setting — `theme` setting key (light/dark/system), ThemeApplier client component, Theme tab in settings, cookie hydration
 36. Feeds in settings — move `<FeedList>` to a Feeds tab, drop top-nav Feeds link, redirect `/feeds → /settings?tab=feeds`
 
-### Phase 8 — Future Enhancements (deferred)
+### Phase 8 — Pipeline tuning (CLOSED — hotfixes only)
+Analyze starvation hotfix + follow-up decisions. Tasks 37/38 closed as won't-do. See [progress.md](progress.md) and [changelog.md](changelog.md) for the details.
+
+### Phase 9 — Pipeline observability (COMPLETE)
+See [phase9-observability-memo.md](phase9-observability-memo.md) for the SSE-vs-polling decision and visual reference [phase9-pipeline-ops-mockup.html](phase9-pipeline-ops-mockup.html). Tasks 39-49: `pipeline_runs` schema, orchestrator with singleton cancel registry, per-article progress threading, scheduler integration, cron-next utility, 4 new SSE/REST endpoints, `PipelineControl` + `PipelineHistory` rewrite, live countdown, comprehensive tests.
+
+### Phase 10 — Analyze allocation (COMPLETE)
+See [phase10-analyze-allocation-memo.md](phase10-analyze-allocation-memo.md). Tasks 50-56: per-feed `analyze_weight` column, weighted proportional allocation with spillover, round-robin iteration order, per-feed fetch logging, UI column. Phase 10.1 follow-up fixed the iteration order from freshness-desc to round-robin.
+
+### Phase 11 — Summarize policy (PROPOSED)
+Small follow-up adding value-first ordering + 14-day window + enabled filter to `summarizeUnsummarized()`. See [pipeline-flow.md](pipeline-flow.md) Layer 3 for rationale.
+
+### Phase 12+ — Future Enhancements (deferred)
 - Full article fetching for thin feeds
 - Custom topic profiles
 - Trend detection over time
 - Export/share digests
 - HTTP conditional requests for RSS (If-Modified-Since, ETag)
-- Rejected-tag suggestion queue (deferred from Q6)
+- Rejected-tag suggestion queue
 - Multi-user authentication layer
 - Materialized view if query performance becomes a concern
+- LLM prompt tuning to deprioritize research preprints relative to lab announcements
