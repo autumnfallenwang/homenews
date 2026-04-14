@@ -6,6 +6,10 @@ Newest entries on top. One line per change when possible — date, scope, what, 
 For phased feature work see [progress.md](progress.md). For recurring-pattern
 corrections see [lessons.md](lessons.md).
 
+## 2026-04-14
+
+- **fix(pipeline)**: orchestrator now re-checks the cancel flag after the summarize phase, before the final-status transition. **Why**: mid-summarize cancellation used to finalize the run as `completed` instead of `cancelled`. Root cause: summarize's in-service loop breaks correctly when the signal flag is flipped and returns partial counts, but the orchestrator had no post-Phase-3 check — so the flow fell through to `if (finalStatus === "running") finalStatus = "completed"`. Mid-analyze cancel was unaffected (Phase 3's entry check caught it), but mid-summarize had no entry check on anything after. Caught while writing Task 48 tests for per-article event threading; test 4 in that batch now locks the fix.
+
 ## 2026-04-13
 
 - **fix(analyze)**: `analyzeUnanalyzed` now orders by `COALESCE(published_at, fetched_at) DESC` and filters to the last 14 days. **Why**: the old query had no `ORDER BY`, so Postgres returned rows in insertion order and the analyze batches burned entirely on OpenAI Blog (935 rows) then Hugging Face (762 rows), never reaching arXiv / Ars / MIT / VentureBeat. DB snapshot before the fix showed 6/9 feeds with 0 analyzed articles; after the filter, the pending queue fans out across those feeds (arXiv cs.AI 615, cs.LG 333, cs.CL 233, Ars 23, MIT 9, OpenAI 2 remaining in-window). Cutoff lives as `ANALYZE_MAX_AGE_DAYS = 14` at the top of `analyze.ts`.

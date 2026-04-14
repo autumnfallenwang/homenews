@@ -1,6 +1,6 @@
 import { getTableColumns, getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { articleAnalysis, articles, feeds, settings } from "../src/db/schema.js";
+import { articleAnalysis, articles, feeds, pipelineRuns, settings } from "../src/db/schema.js";
 
 describe("feeds table", () => {
   it("has correct table name", () => {
@@ -135,5 +135,53 @@ describe("settings table", () => {
     const cols = getTableColumns(settings);
     expect(cols.userId.notNull).toBe(false);
     expect(cols.description.notNull).toBe(false);
+  });
+});
+
+describe("pipeline_runs table", () => {
+  it("has correct table name", () => {
+    expect(getTableName(pipelineRuns)).toBe("pipeline_runs");
+  });
+
+  it("has all expected columns", () => {
+    const cols = getTableColumns(pipelineRuns);
+    expect(Object.keys(cols).sort()).toEqual(
+      [
+        "id",
+        "trigger",
+        "status",
+        "startedAt",
+        "endedAt",
+        "durationMs",
+        "fetchAdded",
+        "fetchErrors",
+        "analyzeAnalyzed",
+        "analyzeErrors",
+        "summarizeSummarized",
+        "summarizeErrors",
+        "errorMessage",
+      ].sort(),
+    );
+  });
+
+  it("has notNull on required columns", () => {
+    const cols = getTableColumns(pipelineRuns);
+    expect(cols.id.notNull).toBe(true);
+    expect(cols.trigger.notNull).toBe(true);
+    expect(cols.status.notNull).toBe(true);
+    expect(cols.startedAt.notNull).toBe(true);
+  });
+
+  it("allows null on end-of-run columns", () => {
+    const cols = getTableColumns(pipelineRuns);
+    expect(cols.endedAt.notNull).toBe(false);
+    expect(cols.durationMs.notNull).toBe(false);
+    expect(cols.fetchAdded.notNull).toBe(false);
+    expect(cols.fetchErrors.notNull).toBe(false);
+    expect(cols.analyzeAnalyzed.notNull).toBe(false);
+    expect(cols.analyzeErrors.notNull).toBe(false);
+    expect(cols.summarizeSummarized.notNull).toBe(false);
+    expect(cols.summarizeErrors.notNull).toBe(false);
+    expect(cols.errorMessage.notNull).toBe(false);
   });
 });

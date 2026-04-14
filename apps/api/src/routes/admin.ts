@@ -1,113 +1,123 @@
+import type { PipelineRun } from "@homenews/shared";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { Hono } from "hono";
-import { analyzeUnanalyzed } from "../services/analyze.js";
-import { fetchAllFeeds } from "../services/feed-fetcher.js";
-import { getSetting } from "../services/settings.js";
-import { summarizeUnsummarized } from "../services/summarize.js";
+import { streamSSE } from "hono/streaming";
+import { db } from "../db/index.js";
+import { pipelineRuns } from "../db/schema.js";
+import { getNextScheduledRunAt } from "../services/cron-next.js";
+import {
+  getActiveRunId,
+  mapPipelineRunRow,
+  requestCancelActiveRun,
+  runPipelineWithProgress,
+} from "../services/pipeline.js";
 
 const app = new Hono();
 
-function ms(start: number): number {
-  return Math.round(performance.now() - start);
-}
-
-function logFetchResults(results: Awaited<ReturnType<typeof fetchAllFeeds>>): void {
-  // One line per feed so we can see exactly which ones are silent or failing.
-  for (const r of results) {
-    if (r.error) {
-      console.warn(`[admin] fetch:${r.feedName} ERROR — ${r.error}`);
-    } else {
-      console.info(`[admin] fetch:${r.feedName} added=${r.added}`);
-    }
+/**
+ * Server-Sent Events stream — starts a new manual pipeline run and pushes
+ * per-phase + per-article progress events as they happen. EventSource
+ * convention requires GET. Singleton-enforced: returns 409 if a run is
+ * already in progress (the client should poll `/status` until it finishes).
+ */
+app.get("/pipeline/stream", (c) => {
+  const activeId = getActiveRunId();
+  if (activeId !== null) {
+    return c.json({ error: "Pipeline already running", activeRunId: activeId }, 409);
   }
-}
 
-/** Manual trigger: fetch all enabled feeds. */
-app.post("/pipeline/fetch", async (c) => {
-  console.info("[admin] fetch start");
-  const t = performance.now();
-  const results = await fetchAllFeeds();
-  logFetchResults(results);
-  const added = results.reduce((sum, r) => sum + r.added, 0);
-  const errors = results.filter((r) => r.error).length;
-  console.info(
-    `[admin] fetch done in ${ms(t)}ms — feeds=${results.length} added=${added} errors=${errors}`,
-  );
-  return c.json({
-    feeds: results.length,
-    added,
-    errors,
-    results,
+  return streamSSE(c, async (stream) => {
+    try {
+      await runPipelineWithProgress("manual", async (event) => {
+        await stream.writeSSE({ data: JSON.stringify(event) });
+      });
+    } catch (err) {
+      // Unlikely: the orchestrator normally catches pipeline-internal
+      // errors and records them as `failed` in pipeline_runs. This branch
+      // is for truly unexpected failures (DB drop, etc.).
+      await stream.writeSSE({
+        event: "error",
+        data: JSON.stringify({
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      });
+    }
   });
 });
 
-/** Manual trigger: analyze articles (relevance, importance, tags). */
-app.post("/pipeline/analyze", async (c) => {
-  const limitParam = c.req.query("limit");
-  const limit =
-    limitParam === undefined ? await getSetting<number>("analyze_batch_size") : Number(limitParam);
-  console.info(`[admin] analyze start limit=${limit}`);
-  const t = performance.now();
-  const result = await analyzeUnanalyzed(limit);
-  console.info(
-    `[admin] analyze done in ${ms(t)}ms — analyzed=${result.analyzed} errors=${result.errors}`,
-  );
-  return c.json({ ...result, limit });
+/** Request cancellation of the currently-active run. 404 if no run matches. */
+app.post("/pipeline/runs/:id/cancel", (c) => {
+  const id = c.req.param("id");
+  const cancelled = requestCancelActiveRun(id);
+  if (!cancelled) {
+    return c.json({ error: "No active run with that id", runId: id }, 404);
+  }
+  return c.json({ ok: true, runId: id });
 });
 
-/** Manual trigger: summarize articles (LLM-generated summary). */
-app.post("/pipeline/summarize", async (c) => {
-  const limitParam = c.req.query("limit");
-  const limit =
-    limitParam === undefined
-      ? await getSetting<number>("summarize_batch_size")
-      : Number(limitParam);
-  console.info(`[admin] summarize start limit=${limit}`);
-  const t = performance.now();
-  const result = await summarizeUnsummarized(limit);
-  console.info(
-    `[admin] summarize done in ${ms(t)}ms — summarized=${result.summarized} errors=${result.errors}`,
-  );
-  return c.json({ ...result, limit });
+/**
+ * List recent pipeline runs. Supports `limit` (default 20, clamped 1-100)
+ * and `trigger` (manual|scheduler). History spans both manual and cron runs.
+ */
+app.get("/pipeline/runs", async (c) => {
+  const limitRaw = Number(c.req.query("limit") ?? 20);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.floor(limitRaw), 1), 100) : 20;
+
+  const triggerParam = c.req.query("trigger");
+  const where =
+    triggerParam === "manual" || triggerParam === "scheduler"
+      ? eq(pipelineRuns.trigger, triggerParam)
+      : undefined;
+
+  const rows = await db
+    .select()
+    .from(pipelineRuns)
+    .where(where)
+    .orderBy(desc(pipelineRuns.startedAt))
+    .limit(limit);
+
+  return c.json(rows.map(mapPipelineRunRow));
 });
 
-/** Manual trigger: run the full pipeline sequentially. */
-app.post("/pipeline/run-all", async (c) => {
-  const total = performance.now();
-  console.info("[admin] run-all start");
+/**
+ * Pipeline status snapshot: currently-active run (if any) and the next
+ * scheduled fire time computed from the `fetch_interval` cron expression.
+ * Called on frontend mount and on window focus — the countdown ticks
+ * locally from the returned `nextRunAt` to avoid clock drift.
+ */
+app.get("/pipeline/status", async (c) => {
+  const activeId = getActiveRunId();
+  let activeRun: PipelineRun | null = null;
 
-  const tFetch = performance.now();
-  const fetchResults = await fetchAllFeeds();
-  logFetchResults(fetchResults);
-  const added = fetchResults.reduce((sum, r) => sum + r.added, 0);
-  const fetchErrors = fetchResults.filter((r) => r.error).length;
-  console.info(
-    `[admin] run-all:fetch done in ${ms(tFetch)}ms — feeds=${fetchResults.length} added=${added} errors=${fetchErrors}`,
-  );
+  if (activeId !== null) {
+    const [row] = await db
+      .select()
+      .from(pipelineRuns)
+      .where(eq(pipelineRuns.id, activeId))
+      .limit(1);
+    if (row) activeRun = mapPipelineRunRow(row);
+  }
 
-  const analyzeLimit = await getSetting<number>("analyze_batch_size");
-  const tAnalyze = performance.now();
-  const analyzeResult = await analyzeUnanalyzed(analyzeLimit);
-  console.info(
-    `[admin] run-all:analyze done in ${ms(tAnalyze)}ms — analyzed=${analyzeResult.analyzed} errors=${analyzeResult.errors} (limit=${analyzeLimit})`,
-  );
+  // Most recent finished run (excluding any currently-running row). Powers
+  // the idle view's "last run 23m ago · fetched 41 · ..." summary.
+  const [lastRow] = await db
+    .select()
+    .from(pipelineRuns)
+    .where(
+      activeId === null
+        ? ne(pipelineRuns.status, "running")
+        : and(ne(pipelineRuns.status, "running"), ne(pipelineRuns.id, activeId)),
+    )
+    .orderBy(desc(pipelineRuns.startedAt))
+    .limit(1);
+  const lastRun = lastRow ? mapPipelineRunRow(lastRow) : null;
 
-  const summarizeLimit = await getSetting<number>("summarize_batch_size");
-  const tSummarize = performance.now();
-  const summarizeResult = await summarizeUnsummarized(summarizeLimit);
-  console.info(
-    `[admin] run-all:summarize done in ${ms(tSummarize)}ms — summarized=${summarizeResult.summarized} errors=${summarizeResult.errors} (limit=${summarizeLimit})`,
-  );
-
-  console.info(`[admin] run-all done in ${ms(total)}ms`);
+  const nextRun = await getNextScheduledRunAt();
 
   return c.json({
-    fetch: {
-      feeds: fetchResults.length,
-      added,
-      errors: fetchErrors,
-    },
-    analyze: { ...analyzeResult, limit: analyzeLimit },
-    summarize: { ...summarizeResult, limit: summarizeLimit },
+    activeRun,
+    lastRun,
+    nextRunAt: nextRun?.toISOString() ?? null,
   });
 });
 

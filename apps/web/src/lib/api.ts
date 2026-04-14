@@ -1,4 +1,12 @@
-import type { AnalyzedArticle, CreateFeed, Feed, Setting, UpdateFeed } from "@homenews/shared";
+import type {
+  AnalyzedArticle,
+  CreateFeed,
+  Feed,
+  PipelineRun,
+  PipelineStatus,
+  Setting,
+  UpdateFeed,
+} from "@homenews/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -88,58 +96,32 @@ export async function resetAllSettings(): Promise<{ reset: number }> {
   return res.json();
 }
 
-// --- Admin pipeline triggers ---
+// --- Phase 9 observability endpoints ---
 
-export interface FetchPipelineResult {
-  feeds: number;
-  added: number;
-  errors: number;
+/** SSE stream URL — consumed via `new EventSource(PIPELINE_STREAM_URL)`. */
+export const PIPELINE_STREAM_URL = `${API_URL}/admin/pipeline/stream`;
+
+export async function fetchPipelineStatus(): Promise<PipelineStatus> {
+  const res = await fetch(`${API_URL}/admin/pipeline/status`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch pipeline status: ${res.status}`);
+  return res.json();
 }
 
-export interface AnalyzePipelineResult {
-  analyzed: number;
-  errors: number;
+export async function cancelPipelineRun(runId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/admin/pipeline/runs/${runId}/cancel`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`Failed to cancel run: ${res.status}`);
+}
+
+export async function fetchPipelineRuns(params?: {
   limit?: number;
-}
-
-export interface SummarizePipelineResult {
-  summarized: number;
-  errors: number;
-  limit?: number;
-}
-
-export interface RunAllPipelineResult {
-  fetch: FetchPipelineResult;
-  analyze: AnalyzePipelineResult;
-  summarize: SummarizePipelineResult;
-}
-
-export async function triggerPipelineFetch(): Promise<FetchPipelineResult> {
-  const res = await fetch(`${API_URL}/admin/pipeline/fetch`, { method: "POST" });
-  if (!res.ok) throw new Error(`Pipeline fetch failed: ${res.status}`);
-  return res.json();
-}
-
-export async function triggerPipelineAnalyze(limit?: number): Promise<AnalyzePipelineResult> {
-  const url = limit
-    ? `${API_URL}/admin/pipeline/analyze?limit=${limit}`
-    : `${API_URL}/admin/pipeline/analyze`;
-  const res = await fetch(url, { method: "POST" });
-  if (!res.ok) throw new Error(`Pipeline analyze failed: ${res.status}`);
-  return res.json();
-}
-
-export async function triggerPipelineSummarize(limit?: number): Promise<SummarizePipelineResult> {
-  const url = limit
-    ? `${API_URL}/admin/pipeline/summarize?limit=${limit}`
-    : `${API_URL}/admin/pipeline/summarize`;
-  const res = await fetch(url, { method: "POST" });
-  if (!res.ok) throw new Error(`Pipeline summarize failed: ${res.status}`);
-  return res.json();
-}
-
-export async function triggerPipelineRunAll(): Promise<RunAllPipelineResult> {
-  const res = await fetch(`${API_URL}/admin/pipeline/run-all`, { method: "POST" });
-  if (!res.ok) throw new Error(`Pipeline run-all failed: ${res.status}`);
+  trigger?: "manual" | "scheduler";
+}): Promise<PipelineRun[]> {
+  const url = new URL(`${API_URL}/admin/pipeline/runs`);
+  if (params?.limit) url.searchParams.set("limit", String(params.limit));
+  if (params?.trigger) url.searchParams.set("trigger", params.trigger);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch pipeline runs: ${res.status}`);
   return res.json();
 }

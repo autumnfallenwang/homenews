@@ -20,6 +20,7 @@
   "dependencies": {
     "@homenews/shared": "workspace:*",
     "@hono/node-server": "^1.19.9",
+    "cron-parser": "^5.5.0",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.9",
     "node-cron": "^4.0.5",

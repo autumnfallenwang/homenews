@@ -183,3 +183,47 @@
     transparent 100%
   );
 }
+
+/* --- Pipeline operations strip (Phase 9) --- */
+
+/* Amber-tinted pulsing ring for the running-state status dot */
+@keyframes pipeline-hot-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(0.76 0.15 65 / 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 7px oklch(0.76 0.15 65 / 0);
+  }
+}
+.pipeline-hot-pulse {
+  animation: pipeline-hot-pulse 1.4s ease-in-out infinite;
+}
+
+/* Blinking colon in the chronometer */
+@keyframes pipeline-colon-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.25;
+  }
+}
+.pipeline-colon-blink {
+  animation: pipeline-colon-blink 1s step-end infinite;
+}
+
+/* Progress bar with amber glow */
+.pipeline-progress-bar {
+  box-shadow: 0 0 8px 0 oklch(0.76 0.15 65 / 0.25);
+  transition: width 400ms ease-out;
+}
+
+/* Soft amber wash on the running card background */
+.pipeline-running-wash {
+  background:
+    linear-gradient(90deg, oklch(0.76 0.15 65 / 0.06) 0%, transparent 35%),
+    oklch(0.225 0.007 60 / 0.5);
+}

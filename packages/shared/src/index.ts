@@ -115,6 +115,64 @@ export const updateSettingSchema = z
   });
 export type UpdateSetting = z.infer<typeof updateSettingSchema>;
 
+// --- Pipeline runs (Phase 9) ---
+// One row per pipeline execution, manual or scheduler-triggered. Written by
+// the pipeline orchestrator; read by the observability endpoints. See
+// docs/phase9-observability-memo.md for full rationale.
+export const pipelineTriggerSchema = z.enum(["manual", "scheduler"]);
+export type PipelineTrigger = z.infer<typeof pipelineTriggerSchema>;
+
+export const pipelineRunStatusSchema = z.enum(["running", "completed", "cancelled", "failed"]);
+export type PipelineRunStatus = z.infer<typeof pipelineRunStatusSchema>;
+
+export const pipelineRunSchema = z.object({
+  id: z.string().uuid(),
+  trigger: pipelineTriggerSchema,
+  status: pipelineRunStatusSchema,
+  startedAt: z.string(),
+  endedAt: z.string().nullable(),
+  durationMs: z.number().int().nullable(),
+  fetchAdded: z.number().int().nullable(),
+  fetchErrors: z.number().int().nullable(),
+  analyzeAnalyzed: z.number().int().nullable(),
+  analyzeErrors: z.number().int().nullable(),
+  summarizeSummarized: z.number().int().nullable(),
+  summarizeErrors: z.number().int().nullable(),
+  errorMessage: z.string().nullable(),
+});
+export type PipelineRun = z.infer<typeof pipelineRunSchema>;
+
+// Response shape of GET /admin/pipeline/status — active run (if any) +
+// most recent completed/cancelled/failed run + next scheduled fire time
+// for the frontend countdown.
+export const pipelineStatusSchema = z.object({
+  activeRun: pipelineRunSchema.nullable(),
+  lastRun: pipelineRunSchema.nullable(),
+  nextRunAt: z.string().nullable(),
+});
+export type PipelineStatus = z.infer<typeof pipelineStatusSchema>;
+
+// Progress events emitted by the pipeline orchestrator. Consumed by the SSE
+// endpoint (Task 44) and ultimately the PipelineControl frontend. The
+// `analyze-item` / `summarize-item` variants are defined here but only emitted
+// once Task 41 threads per-article progress through analyze/summarize.
+export type PipelineProgressEvent =
+  | { type: "run-start"; runId: string; trigger: PipelineTrigger; startedAt: string }
+  | { type: "fetch-start" }
+  | { type: "fetch-done"; added: number; errors: number }
+  | { type: "analyze-start"; total?: number }
+  | { type: "analyze-item"; index: number; total: number; title: string; feedName: string }
+  | { type: "analyze-done"; analyzed: number; errors: number }
+  | { type: "summarize-start"; total?: number }
+  | { type: "summarize-item"; index: number; total: number; title: string; feedName: string }
+  | { type: "summarize-done"; summarized: number; errors: number }
+  | {
+      type: "run-done";
+      status: PipelineRunStatus;
+      durationMs: number;
+      errorMessage?: string;
+    };
+
 // --- Allowed tag vocabulary (memo Q5) ---
 export const ALLOWED_TAGS = [
   // Topic areas

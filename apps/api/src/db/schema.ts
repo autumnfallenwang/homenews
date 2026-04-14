@@ -1,6 +1,7 @@
 import { eq, getTableColumns } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
   pgTable,
   pgView,
@@ -65,6 +66,32 @@ export const settings = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique("settings_user_id_key_unique").on(table.userId, table.key)],
+);
+
+// Pipeline runs: one row per pipeline execution, manual or scheduler-triggered.
+// Used by the orchestrator to persist run history (Phase 9 Task 40). Start row
+// is inserted when a run begins; per-phase counts + status are filled in as
+// the run progresses. See docs/phase9-observability-memo.md for the full rationale.
+export const pipelineRuns = pgTable(
+  "pipeline_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // 'manual' | 'scheduler'
+    trigger: text("trigger").notNull(),
+    // 'running' | 'completed' | 'cancelled' | 'failed'
+    status: text("status").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    fetchAdded: integer("fetch_added"),
+    fetchErrors: integer("fetch_errors"),
+    analyzeAnalyzed: integer("analyze_analyzed"),
+    analyzeErrors: integer("analyze_errors"),
+    summarizeSummarized: integer("summarize_summarized"),
+    summarizeErrors: integer("summarize_errors"),
+    errorMessage: text("error_message"),
+  },
+  (table) => [index("pipeline_runs_started_at_idx").on(table.startedAt.desc())],
 );
 
 // View: joins for ranked API queries. No math here — composite score is computed

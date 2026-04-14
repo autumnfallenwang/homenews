@@ -1,8 +1,16 @@
+import type { PipelineProgressEvent } from "@homenews/shared";
 import { and, desc, eq, gte, isNull, notExists, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { articleAnalysis, articles } from "../db/schema.js";
+import { articleAnalysis, articles, feeds } from "../db/schema.js";
 import { llmExecute } from "./llm-executor.js";
 import { getSetting } from "./settings.js";
+
+interface AnalyzeOptions {
+  onProgress?: (event: PipelineProgressEvent) => void | Promise<void>;
+  /** Mutable cancel flag shared with the pipeline orchestrator. Checked
+   *  before each LLM call; in-flight work always completes. */
+  signal?: { cancelRequested: boolean };
+}
 
 /** Cutoff for which unanalyzed articles the pipeline will even look at.
  *  Historical backfill (OpenAI goes back to 2015) would otherwise monopolize
@@ -69,15 +77,24 @@ export async function analyzeArticle(
 
 export async function analyzeUnanalyzed(
   limit?: number,
+  options: AnalyzeOptions = {},
 ): Promise<{ analyzed: number; errors: number }> {
+  const { onProgress, signal } = options;
+
   // Use COALESCE(published_at, fetched_at) as the effective date so feeds that
   // don't populate published_at still get ordered sensibly.
   const effectiveDate = sql<Date>`COALESCE(${articles.publishedAt}, ${articles.fetchedAt})`;
   const cutoff = sql<Date>`NOW() - (${ANALYZE_MAX_AGE_DAYS} || ' days')::interval`;
 
   const baseQuery = db
-    .select({ id: articles.id, title: articles.title, summary: articles.summary })
+    .select({
+      id: articles.id,
+      title: articles.title,
+      summary: articles.summary,
+      feedName: feeds.name,
+    })
     .from(articles)
+    .innerJoin(feeds, eq(articles.feedId, feeds.id))
     .where(
       and(
         isNull(articles.duplicateOfId),
@@ -98,11 +115,23 @@ export async function analyzeUnanalyzed(
     .orderBy(desc(effectiveDate));
 
   const unanalyzed = limit && limit > 0 ? await baseQuery.limit(limit) : await baseQuery;
+  const total = unanalyzed.length;
+
+  await onProgress?.({ type: "analyze-start", total });
 
   let analyzed = 0;
   let errors = 0;
 
-  for (const article of unanalyzed) {
+  for (let i = 0; i < unanalyzed.length; i++) {
+    if (signal?.cancelRequested) break;
+    const article = unanalyzed[i];
+    await onProgress?.({
+      type: "analyze-item",
+      index: i,
+      total,
+      title: article.title,
+      feedName: article.feedName,
+    });
     try {
       const result = await analyzeArticle(article.title, article.summary);
       await db.insert(articleAnalysis).values({
@@ -120,5 +149,6 @@ export async function analyzeUnanalyzed(
     }
   }
 
+  await onProgress?.({ type: "analyze-done", analyzed, errors });
   return { analyzed, errors };
 }

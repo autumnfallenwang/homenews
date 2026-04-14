@@ -1,7 +1,15 @@
+import type { PipelineProgressEvent } from "@homenews/shared";
 import { eq, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { articleAnalysis, articles } from "../db/schema.js";
+import { articleAnalysis, articles, feeds } from "../db/schema.js";
 import { llmExecute } from "./llm-executor.js";
+
+interface SummarizeOptions {
+  onProgress?: (event: PipelineProgressEvent) => void | Promise<void>;
+  /** Mutable cancel flag shared with the pipeline orchestrator. Checked
+   *  before each LLM call; in-flight work always completes. */
+  signal?: { cancelRequested: boolean };
+}
 
 export function buildSummaryPrompt(
   title: string,
@@ -38,24 +46,41 @@ export async function summarizeArticle(
 
 export async function summarizeUnsummarized(
   limit?: number,
+  options: SummarizeOptions = {},
 ): Promise<{ summarized: number; errors: number }> {
+  const { onProgress, signal } = options;
+
   const baseQuery = db
     .select({
       analysisId: articleAnalysis.id,
       title: articles.title,
       summary: articles.summary,
       content: articles.content,
+      feedName: feeds.name,
     })
     .from(articleAnalysis)
     .innerJoin(articles, eq(articleAnalysis.articleId, articles.id))
+    .innerJoin(feeds, eq(articles.feedId, feeds.id))
     .where(isNull(articleAnalysis.llmSummary));
 
   const unsummarized = limit && limit > 0 ? await baseQuery.limit(limit) : await baseQuery;
+  const total = unsummarized.length;
+
+  await onProgress?.({ type: "summarize-start", total });
 
   let summarized = 0;
   let errors = 0;
 
-  for (const row of unsummarized) {
+  for (let i = 0; i < unsummarized.length; i++) {
+    if (signal?.cancelRequested) break;
+    const row = unsummarized[i];
+    await onProgress?.({
+      type: "summarize-item",
+      index: i,
+      total,
+      title: row.title,
+      feedName: row.feedName,
+    });
     try {
       const llmSummary = await summarizeArticle(row.title, row.summary, row.content);
       await db
@@ -71,5 +96,6 @@ export async function summarizeUnsummarized(
     }
   }
 
+  await onProgress?.({ type: "summarize-done", summarized, errors });
   return { summarized, errors };
 }
