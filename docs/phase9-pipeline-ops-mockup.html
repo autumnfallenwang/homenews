@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HomeNews · Pipeline Ops · Design Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Geist+Mono:wght@400;500;600&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     HomeNews · Pipeline Operations Strip
+     Design reference mockup — three states stacked for review.
+     Aesthetic: Newsroom Workstation (warm charcoal + amber).
+     ============================================================ */
+
+  :root {
+    /* warm charcoal palette — oklch */
+    --background:        oklch(0.19 0.006 60);
+    --background-elev:   oklch(0.21 0.006 60);
+    --foreground:        oklch(0.92 0.008 80);
+    --foreground-dim:    oklch(0.82 0.008 80);
+    --card:              oklch(0.225 0.007 60);
+    --card-trans:        oklch(0.225 0.007 60 / 0.5);
+    --card-hover:        oklch(0.25 0.008 60 / 0.5);
+    --muted:             oklch(0.25 0.008 60);
+    --muted-foreground:  oklch(0.66 0.015 70);
+    --muted-fg-dim:      oklch(0.53 0.012 70);
+
+    /* amber accent */
+    --primary:           oklch(0.76 0.15 65);
+    --primary-contrast:  oklch(0.18 0.01 60);
+    --primary-dim:       oklch(0.76 0.15 65 / 0.14);
+    --primary-wash:      oklch(0.76 0.15 65 / 0.06);
+    --primary-edge:      oklch(0.76 0.15 65 / 0.45);
+    --primary-glow:      oklch(0.76 0.15 65 / 0.25);
+
+    /* structure */
+    --border:            oklch(0.31 0.008 60);
+    --border-strong:     oklch(0.36 0.009 60);
+    --hairline:          oklch(0.31 0.008 60 / 0.7);
+    --hairline-soft:     oklch(0.31 0.008 60 / 0.45);
+
+    /* semantic */
+    --success:           oklch(0.72 0.13 145);
+    --destructive:       oklch(0.66 0.2 25);
+    --destructive-dim:   oklch(0.66 0.2 25 / 0.14);
+    --destructive-edge:  oklch(0.66 0.2 25 / 0.45);
+
+    /* typography */
+    --font-display: 'Fraunces', ui-serif, Georgia, serif;
+    --font-sans:    'Geist', system-ui, -apple-system, sans-serif;
+    --font-mono:    'Geist Mono', ui-monospace, 'Menlo', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-feature-settings: "ss01", "cv11";
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100vh;
+  }
+
+  body {
+    /* atmospheric warmth — barely-there amber glow in the corners */
+    background:
+      radial-gradient(ellipse 900px 600px at 18% 0%, oklch(0.76 0.15 65 / 0.035) 0%, transparent 60%),
+      radial-gradient(ellipse 900px 600px at 85% 100%, oklch(0.76 0.15 65 / 0.028) 0%, transparent 60%),
+      var(--background);
+  }
+
+  /* ============================================================
+     SITE NAV (page context)
+     ============================================================ */
+
+  .site-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    border-bottom: 1px solid var(--border);
+    background: oklch(0.19 0.006 60 / 0.85);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  .site-nav-inner {
+    max-width: 1152px;
+    margin: 0 auto;
+    padding: 0 24px;
+    height: 54px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .wordmark {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--foreground);
+  }
+
+  .wordmark-main {
+    font-family: var(--font-display);
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 0;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.022em;
+    line-height: 1;
+  }
+  .wordmark-main em {
+    color: var(--primary);
+    font-style: normal;
+  }
+
+  .wordmark-ver {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .site-nav-links {
+    display: flex;
+    gap: 2px;
+  }
+
+  .nav-link {
+    padding: 6px 11px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    text-decoration: none;
+    border-radius: 2px;
+    transition: background 160ms, color 160ms;
+  }
+  .nav-link:hover { color: var(--foreground); background: var(--card-hover); }
+  .nav-link.active { color: var(--foreground); }
+
+  .site-nav-status {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .status-pip {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 0 var(--success);
+    animation: calm-pulse 2.8s ease-in-out infinite;
+  }
+
+  /* ============================================================
+     PAGE SHELL
+     ============================================================ */
+
+  .page {
+    max-width: 1152px;
+    margin: 0 auto;
+    padding: 48px 24px 120px;
+  }
+
+  .page-header {
+    padding-bottom: 48px;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    margin-bottom: 16px;
+  }
+  .eyebrow::before {
+    content: "";
+    display: inline-block;
+    width: 26px;
+    height: 1px;
+    background: var(--primary);
+  }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 0;
+    font-size: 60px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.024em;
+    margin: 0;
+    color: var(--foreground);
+  }
+  .page-title em {
+    color: var(--primary);
+    font-style: italic;
+    font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 0;
+  }
+
+  .page-sub {
+    margin: 18px 0 0;
+    max-width: 620px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--muted-foreground);
+  }
+
+  /* ============================================================
+     MOCK LABEL — editorial "design sheet" captions
+     ============================================================ */
+
+  .mock {
+    margin-top: 64px;
+  }
+  .mock:first-of-type { margin-top: 0; }
+
+  .mock-label {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    padding: 0 2px 18px;
+  }
+
+  .mock-label-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted-fg-dim);
+  }
+
+  .mock-label-title {
+    font-family: var(--font-display);
+    font-variation-settings: "opsz" 48;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--foreground-dim);
+    letter-spacing: -0.006em;
+  }
+
+  .mock-label-caption {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-fg-dim);
+  }
+
+  /* ============================================================
+     PIPELINE STRIP — shared chassis
+     ============================================================ */
+
+  .strip {
+    position: relative;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--card-trans);
+    overflow: hidden;
+  }
+
+  /* amber inset rail — appears when running */
+  .strip::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 0;
+    bottom: -1px;
+    width: 2px;
+    background: transparent;
+    transition: background 240ms ease;
+    pointer-events: none;
+  }
+  .strip[data-state="running"]::before {
+    background: var(--primary);
+    box-shadow: 0 0 12px 0 var(--primary-glow);
+  }
+
+  /* subtle amber wash across the running card */
+  .strip[data-state="running"] {
+    background:
+      linear-gradient(90deg, var(--primary-wash) 0%, transparent 35%),
+      var(--card-trans);
+  }
+
+  .strip-inner {
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    min-height: 56px;
+  }
+
+  /* ============================================================
+     STATE BADGE (left cluster — wordmark + dot + label)
+     ============================================================ */
+
+  .state-badge {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-right: 22px;
+    border-right: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+
+  .state-wordmark {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--foreground);
+  }
+
+  .state-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .state-dot.idle {
+    background: var(--success);
+    box-shadow: 0 0 0 0 oklch(0.72 0.13 145 / 0.5);
+    animation: calm-pulse 3.2s ease-in-out infinite;
+  }
+  .state-dot.running {
+    background: var(--primary);
+    box-shadow: 0 0 0 0 var(--primary-glow);
+    animation: hot-pulse 1.4s ease-in-out infinite;
+  }
+
+  .state-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .state-label.hot { color: var(--primary); }
+
+  /* ============================================================
+     IDLE MIDDLE CLUSTER (last-run summary)
+     ============================================================ */
+
+  .idle-middle {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .idle-middle .time {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--foreground);
+    font-weight: 500;
+  }
+
+  .trigger-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px 3px 6px;
+    border: 1px solid var(--hairline);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .trigger-chip svg {
+    width: 11px;
+    height: 11px;
+    color: var(--muted-fg-dim);
+  }
+
+  .stat-triple {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    font-family: var(--font-mono);
+  }
+  .stat-triple .stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .stat-triple .k {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .stat-triple .v {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--foreground);
+  }
+  .stat-triple .sep {
+    font-size: 11px;
+    color: var(--muted-fg-dim);
+  }
+
+  .dot-sep {
+    color: var(--muted-fg-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  /* ============================================================
+     IDLE RIGHT CLUSTER (next-run + primary button)
+     ============================================================ */
+
+  .idle-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+
+  .next-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .next-pill svg {
+    width: 12px;
+    height: 12px;
+    color: var(--primary);
+    opacity: 0.85;
+  }
+  .next-pill .next-eta {
+    color: var(--foreground);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+  }
+
+  /* ============================================================
+     BUTTONS
+     ============================================================ */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 16px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    background: transparent;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+    user-select: none;
+  }
+  .btn svg {
+    width: 13px;
+    height: 13px;
+    transition: transform 200ms ease;
+  }
+
+  .btn-primary {
+    color: var(--primary);
+    border: 1px solid var(--primary-edge);
+    background: var(--primary-dim);
+  }
+  .btn-primary:hover {
+    color: var(--primary-contrast);
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .btn-primary:hover svg { transform: translateX(3px); }
+
+  .btn-danger {
+    color: var(--destructive);
+    border: 1px solid var(--destructive-edge);
+    background: var(--destructive-dim);
+  }
+  .btn-danger:hover {
+    color: var(--foreground);
+    background: var(--destructive);
+    border-color: var(--destructive);
+  }
+
+  /* ============================================================
+     DISCLOSURE ROW (history toggle)
+     ============================================================ */
+
+  .disclosure-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 28px;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    transition: color 180ms, background 180ms;
+  }
+  .disclosure-row:hover {
+    color: var(--foreground);
+    background: oklch(0.25 0.008 60 / 0.35);
+  }
+
+  .disclosure-chev {
+    width: 10px;
+    height: 10px;
+    transition: transform 220ms ease;
+    color: var(--muted-fg-dim);
+  }
+  .strip[data-history="open"] .disclosure-chev {
+    transform: rotate(90deg);
+    color: var(--primary);
+  }
+
+  .disclosure-row .count {
+    margin-left: auto;
+    color: var(--muted-fg-dim);
+    letter-spacing: 0.14em;
+  }
+  .disclosure-row .count b {
+    font-weight: 500;
+    color: var(--foreground-dim);
+  }
+
+  /* ============================================================
+     RUNNING STATE
+     ============================================================ */
+
+  .running-strip {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 18px 28px 20px;
+  }
+
+  .running-top {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .running-top .state-badge {
+    border-right: none;
+    padding-right: 0;
+  }
+
+  /* chronometer */
+  .elapsed {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-left: 24px;
+    border-left: 1px solid var(--hairline);
+    font-family: var(--font-mono);
+  }
+  .elapsed-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .elapsed-value {
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--foreground);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .elapsed-value .colon {
+    color: var(--primary);
+    animation: colon-blink 1s step-end infinite;
+    display: inline-block;
+    transform: translateY(-1px);
+  }
+
+  .spacer { flex: 1; }
+
+  /* ============================================================
+     PHASE INDICATOR — the anchor element
+     ============================================================ */
+
+  .phases {
+    display: grid;
+    grid-template-columns: 1fr 1.45fr 1fr;
+    border: 1px solid var(--hairline);
+    border-radius: 2px;
+    overflow: hidden;
+    background: oklch(0.2 0.006 60 / 0.5);
+  }
+
+  .phase {
+    position: relative;
+    padding: 13px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-right: 1px solid var(--hairline);
+    min-width: 0;
+  }
+  .phase:last-child { border-right: none; }
+
+  .phase-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .phase-id {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+  }
+
+  .phase-icon {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    color: var(--muted-fg-dim);
+  }
+  .phase.done .phase-icon,
+  .phase.active .phase-icon { color: var(--primary); }
+
+  .phase-num {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    color: var(--muted-fg-dim);
+  }
+  .phase.done .phase-num,
+  .phase.active .phase-num { color: var(--primary); }
+
+  .phase-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .phase.done .phase-name,
+  .phase.active .phase-name { color: var(--foreground); }
+
+  .phase-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--foreground);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .phase.upcoming .phase-meta { color: var(--muted-fg-dim); }
+
+  /* active state — amber wash */
+  .phase.active {
+    background: var(--primary-dim);
+  }
+
+  .phase-progress {
+    height: 2px;
+    margin-top: 4px;
+    background: oklch(0.25 0.008 60);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  .phase-progress-bar {
+    height: 100%;
+    background: var(--primary);
+    width: 43%;
+    transform-origin: left;
+  }
+  .phase.active .phase-progress-bar {
+    animation: progress-drift 4s ease-in-out infinite;
+    box-shadow: 0 0 8px 0 var(--primary-glow);
+  }
+  .phase.done .phase-progress-bar {
+    width: 100%;
+    opacity: 0.55;
+  }
+  .phase.upcoming .phase-progress {
+    background: transparent;
+    height: 1px;
+    border-top: 1px dashed var(--hairline-soft);
+  }
+  .phase.upcoming .phase-progress-bar { display: none; }
+
+  /* ============================================================
+     LIVE ARTICLE TICKER (the editorial moment)
+     ============================================================ */
+
+  .ticker {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 6px 2px 2px;
+    min-width: 0;
+  }
+
+  .ticker-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--primary);
+  }
+  .ticker-label::before {
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 6px solid var(--primary);
+  }
+
+  .ticker-title {
+    font-family: var(--font-display);
+    font-variation-settings: "opsz" 48, "SOFT" 20;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 18px;
+    letter-spacing: -0.008em;
+    color: var(--foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+    line-height: 1.2;
+    animation: ticker-slide 6.5s ease-in-out infinite;
+  }
+
+  .ticker-source {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .ticker-source b {
+    color: var(--foreground);
+    font-weight: 500;
+  }
+
+  /* ============================================================
+     RUNNING BOTTOM — accumulating totals + streaming indicator
+     ============================================================ */
+
+  .running-bottom {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding-top: 10px;
+    border-top: 1px solid var(--hairline-soft);
+  }
+
+  .running-bottom .lead {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted-fg-dim);
+  }
+
+  .running-bottom .stats {
+    display: flex;
+    gap: 18px;
+  }
+  .running-bottom .s {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    font-family: var(--font-mono);
+  }
+  .running-bottom .s .k {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .running-bottom .s .v {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--foreground);
+    letter-spacing: 0.02em;
+  }
+  .running-bottom .s .v.muted { color: var(--muted-fg-dim); font-weight: 400; }
+
+  .running-bottom .live {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--primary);
+  }
+
+  .live-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 0 0 var(--primary-glow);
+    animation: hot-pulse 1.4s ease-in-out infinite;
+  }
+
+  /* ============================================================
+     HISTORY DRAWER
+     ============================================================ */
+
+  .history {
+    border-top: 1px solid var(--border);
+    background: oklch(0.2 0.006 60 / 0.55);
+    padding: 22px 28px 24px;
+  }
+
+  .history-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .history-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .history-title b {
+    color: var(--foreground);
+    font-weight: 500;
+  }
+
+  .history-filter {
+    margin-left: auto;
+    display: inline-flex;
+    border: 1px solid var(--hairline);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .history-filter button {
+    appearance: none;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--hairline);
+    padding: 6px 13px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    transition: background 160ms, color 160ms;
+  }
+  .history-filter button:last-child { border-right: none; }
+  .history-filter button.on {
+    background: var(--primary-dim);
+    color: var(--primary);
+  }
+  .history-filter button:hover:not(.on) {
+    color: var(--foreground);
+    background: oklch(0.25 0.008 60 / 0.5);
+  }
+
+  /* list */
+  .history-list { display: flex; flex-direction: column; }
+
+  .run {
+    display: grid;
+    grid-template-columns: 108px 22px 170px 76px 1fr 14px;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 4px;
+    border-top: 1px solid var(--hairline-soft);
+    font-family: var(--font-mono);
+    transition: background 160ms;
+    cursor: pointer;
+  }
+  .run:first-child { border-top: 1px solid var(--hairline); }
+  .run:hover {
+    background: oklch(0.25 0.008 60 / 0.3);
+  }
+  .run.is-open {
+    background: oklch(0.25 0.008 60 / 0.4);
+  }
+
+  .run .trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .run .trigger svg {
+    width: 11px;
+    height: 11px;
+    color: var(--muted-fg-dim);
+  }
+
+  .run .status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+  }
+  .run .status svg { width: 15px; height: 15px; }
+  .run.ok       .status { color: var(--primary); }
+  .run.cancelled .status { color: var(--muted-foreground); }
+  .run.failed   .status { color: var(--destructive); }
+
+  .run .time {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--foreground);
+  }
+  .run .time .rel {
+    color: var(--muted-foreground);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    font-weight: 400;
+  }
+
+  .run .dur {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--foreground-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .run .counts {
+    display: inline-flex;
+    gap: 12px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground);
+  }
+  .run .counts b {
+    color: var(--foreground);
+    font-weight: 500;
+  }
+  .run .counts .muted {
+    color: var(--muted-fg-dim);
+  }
+  .run .counts .sep {
+    color: var(--muted-fg-dim);
+  }
+
+  .run .chev {
+    width: 10px;
+    height: 10px;
+    color: var(--muted-fg-dim);
+    transition: transform 200ms ease, color 200ms;
+    justify-self: end;
+  }
+  .run.is-open .chev {
+    transform: rotate(90deg);
+    color: var(--primary);
+  }
+
+  /* expanded detail rows */
+  .run-detail {
+    grid-column: 1 / -1;
+    display: none;
+    margin-top: 10px;
+    padding: 12px 14px 12px;
+    border-top: 1px dashed var(--hairline);
+    background: oklch(0.17 0.006 60 / 0.5);
+    border-left: 2px solid var(--muted-fg-dim);
+  }
+  .run.is-open .run-detail { display: block; }
+  .run.failed.is-open .run-detail { border-left-color: var(--destructive); }
+  .run.cancelled.is-open .run-detail { border-left-color: var(--muted-foreground); }
+
+  .run-detail .drow {
+    display: flex;
+    gap: 14px;
+    padding: 4px 0;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+  .run-detail .drow .dk {
+    flex-shrink: 0;
+    width: 110px;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted-fg-dim);
+  }
+  .run-detail .drow .dv {
+    color: var(--foreground-dim);
+    font-family: var(--font-mono);
+  }
+  .run.failed .run-detail .dv.err {
+    color: var(--destructive);
+  }
+
+  /* ============================================================
+     ANIMATIONS
+     ============================================================ */
+
+  @keyframes calm-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 oklch(0.72 0.13 145 / 0.55); }
+    50%      { box-shadow: 0 0 0 6px oklch(0.72 0.13 145 / 0); }
+  }
+
+  @keyframes hot-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 oklch(0.76 0.15 65 / 0.6); }
+    50%      { box-shadow: 0 0 0 7px oklch(0.76 0.15 65 / 0); }
+  }
+
+  @keyframes colon-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.25; }
+  }
+
+  @keyframes progress-drift {
+    0%   { width: 38%; }
+    45%  { width: 47%; }
+    80%  { width: 55%; }
+    100% { width: 62%; }
+  }
+
+  @keyframes ticker-slide {
+    0%, 8%   { opacity: 0; transform: translateY(6px); }
+    14%, 68% { opacity: 1; transform: translateY(0); }
+    78%, 100%{ opacity: 0; transform: translateY(-6px); }
+  }
+
+  /* ============================================================
+     RESPONSIVE — strip reflow
+     ============================================================ */
+
+  @media (max-width: 900px) {
+    .strip-inner { flex-wrap: wrap; gap: 14px 20px; padding: 16px 22px; }
+    .state-badge { padding-right: 16px; }
+    .idle-middle { order: 3; flex-basis: 100%; border-top: 1px solid var(--hairline-soft); padding-top: 14px; }
+    .idle-right { order: 2; margin-left: auto; }
+    .phases { grid-template-columns: 1fr; }
+    .phase { border-right: none; border-bottom: 1px solid var(--hairline); }
+    .phase:last-child { border-bottom: none; }
+    .running-top { flex-wrap: wrap; gap: 14px 20px; }
+    .elapsed { padding-left: 0; border-left: none; }
+    .run { grid-template-columns: 80px 18px 1fr 60px auto 14px; }
+    .run .counts { display: none; }
+    .history-head { flex-wrap: wrap; }
+    .page-title { font-size: 44px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     SITE NAV — real app chrome, kept minimal for context
+     ================================================================ -->
+<header class="site-nav">
+  <div class="site-nav-inner">
+    <a href="#" class="wordmark">
+      <span class="wordmark-main">Home<em>News</em></span>
+      <span class="wordmark-ver">v0.5</span>
+    </a>
+    <nav class="site-nav-links">
+      <a class="nav-link active" href="#">Dashboard</a>
+      <a class="nav-link" href="#">Settings</a>
+    </nav>
+    <div class="site-nav-status">
+      <span>Workstation</span>
+      <span class="status-pip" aria-hidden="true"></span>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- ================================================================
+       PAGE HEADER — so the strip is evaluated in context
+       ================================================================ -->
+  <div class="page-header">
+    <div class="eyebrow">Today's Briefing · 14 sources · 2026-04-13</div>
+    <h1 class="page-title">The day in <em>AI</em>.</h1>
+    <p class="page-sub">Design reference for the Pipeline Operations Strip — the three production states rendered simultaneously so they can be evaluated side by side. In the real app only one state is visible at a time.</p>
+  </div>
+
+  <!-- ================================================================
+       STATE 01 — IDLE
+       Resting state; history drawer collapsed.
+       ================================================================ -->
+  <section class="mock">
+    <div class="mock-label">
+      <span class="mock-label-num">State 01</span>
+      <span class="mock-label-title">Idle</span>
+      <span class="mock-label-caption">Default resting state · history drawer collapsed</span>
+    </div>
+
+    <div class="strip" data-state="idle">
+      <div class="strip-inner">
+
+        <!-- Left: wordmark + status dot + label -->
+        <div class="state-badge">
+          <span class="state-wordmark">Pipeline</span>
+          <span class="state-dot idle" aria-hidden="true"></span>
+          <span class="state-label">Idle</span>
+        </div>
+
+        <!-- Middle: last run summary -->
+        <div class="idle-middle">
+          <span class="time">23m ago</span>
+          <span class="trigger-chip">
+            <!-- keyboard glyph -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+              <rect x="2.5" y="6.5" width="19" height="11" rx="1.5"/>
+              <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>
+            </svg>
+            Manual
+          </span>
+          <span class="dot-sep">·</span>
+          <div class="stat-triple">
+            <span class="stat"><span class="k">Fetched</span><span class="v">41</span></span>
+            <span class="sep">·</span>
+            <span class="stat"><span class="k">Analyzed</span><span class="v">100</span></span>
+            <span class="sep">·</span>
+            <span class="stat"><span class="k">Summarized</span><span class="v">100</span></span>
+          </div>
+        </div>
+
+        <!-- Right: next scheduled + primary button -->
+        <div class="idle-right">
+          <span class="next-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M12 7v5l3 2"/>
+            </svg>
+            Next in <span class="next-eta">1h&nbsp;47m</span>
+          </span>
+          <button class="btn btn-primary" type="button">
+            Run pipeline
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14M13 5l7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- History disclosure (closed) -->
+      <div class="disclosure-row">
+        <svg class="disclosure-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6"/>
+        </svg>
+        Show history
+        <span class="count"><b>127</b> runs · last 30 days</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       STATE 02 — RUNNING
+       Live per-article progress streaming via SSE. Cancel available.
+       ================================================================ -->
+  <section class="mock">
+    <div class="mock-label">
+      <span class="mock-label-num">State 02</span>
+      <span class="mock-label-title">Running</span>
+      <span class="mock-label-caption">Live · per-article SSE · cancellable between calls</span>
+    </div>
+
+    <div class="strip" data-state="running">
+      <div class="strip-inner running-strip">
+
+        <!-- Top row: wordmark · dot · label · elapsed · cancel -->
+        <div class="running-top">
+          <div class="state-badge">
+            <span class="state-wordmark">Pipeline</span>
+            <span class="state-dot running" aria-hidden="true"></span>
+            <span class="state-label hot">Running</span>
+          </div>
+
+          <div class="elapsed">
+            <span class="elapsed-label">Elapsed</span>
+            <span class="elapsed-value">02<span class="colon">:</span>14</span>
+          </div>
+
+          <div class="spacer"></div>
+
+          <button class="btn btn-danger" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M6 18L18 6"/>
+            </svg>
+            Cancel
+          </button>
+        </div>
+
+        <!-- Phase indicator -->
+        <div class="phases">
+
+          <div class="phase done">
+            <div class="phase-head">
+              <div class="phase-id">
+                <svg class="phase-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12l5 5L20 7"/>
+                </svg>
+                <span class="phase-num">01</span>
+                <span class="phase-name">Fetch</span>
+              </div>
+              <span class="phase-meta">41 new</span>
+            </div>
+            <div class="phase-progress"><div class="phase-progress-bar" style="width:100%"></div></div>
+          </div>
+
+          <div class="phase active">
+            <div class="phase-head">
+              <div class="phase-id">
+                <svg class="phase-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 2.5v3M12 18.5v3M4.5 4.5l2.1 2.1M17.4 17.4l2.1 2.1M2.5 12h3M18.5 12h3M4.5 19.5l2.1-2.1M17.4 6.6l2.1-2.1"/>
+                </svg>
+                <span class="phase-num">02</span>
+                <span class="phase-name">Analyze</span>
+              </div>
+              <span class="phase-meta">43 / 100</span>
+            </div>
+            <div class="phase-progress"><div class="phase-progress-bar"></div></div>
+          </div>
+
+          <div class="phase upcoming">
+            <div class="phase-head">
+              <div class="phase-id">
+                <svg class="phase-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M6 3.5h9l4 4V20.5H6z"/>
+                  <path d="M9.5 10h6M9.5 14h6M9.5 18h4"/>
+                </svg>
+                <span class="phase-num">03</span>
+                <span class="phase-name">Summarize</span>
+              </div>
+              <span class="phase-meta">—</span>
+            </div>
+            <div class="phase-progress"></div>
+          </div>
+
+        </div>
+
+        <!-- Live article ticker (the editorial moment) -->
+        <div class="ticker">
+          <span class="ticker-label">Now</span>
+          <span class="ticker-title">Scaling Managed Agents: Decoupling the brain from the hands</span>
+          <span class="ticker-source">from <b>Anthropic</b></span>
+        </div>
+
+        <!-- Accumulating totals -->
+        <div class="running-bottom">
+          <span class="lead">Run totals</span>
+          <div class="stats">
+            <span class="s"><span class="k">Fetched</span><span class="v">41</span></span>
+            <span class="s"><span class="k">Analyzed</span><span class="v">43</span></span>
+            <span class="s"><span class="k">Summarized</span><span class="v muted">—</span></span>
+          </div>
+          <span class="live">
+            <span class="live-dot" aria-hidden="true"></span>
+            Streaming
+          </span>
+        </div>
+      </div>
+
+      <!-- Disclosure stays present while running, collapsed -->
+      <div class="disclosure-row">
+        <svg class="disclosure-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6"/>
+        </svg>
+        Show history
+        <span class="count"><b>127</b> runs · last 30 days</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       STATE 03 — HISTORY OPEN
+       Drawer expanded · filter · click-to-expand failures
+       ================================================================ -->
+  <section class="mock">
+    <div class="mock-label">
+      <span class="mock-label-num">State 03</span>
+      <span class="mock-label-title">History open</span>
+      <span class="mock-label-caption">Drawer expanded · filter · two rows click-expanded</span>
+    </div>
+
+    <div class="strip" data-state="idle" data-history="open">
+      <div class="strip-inner">
+        <div class="state-badge">
+          <span class="state-wordmark">Pipeline</span>
+          <span class="state-dot idle" aria-hidden="true"></span>
+          <span class="state-label">Idle</span>
+        </div>
+
+        <div class="idle-middle">
+          <span class="time">23m ago</span>
+          <span class="trigger-chip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+              <rect x="2.5" y="6.5" width="19" height="11" rx="1.5"/>
+              <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>
+            </svg>
+            Manual
+          </span>
+          <span class="dot-sep">·</span>
+          <div class="stat-triple">
+            <span class="stat"><span class="k">Fetched</span><span class="v">41</span></span>
+            <span class="sep">·</span>
+            <span class="stat"><span class="k">Analyzed</span><span class="v">100</span></span>
+            <span class="sep">·</span>
+            <span class="stat"><span class="k">Summarized</span><span class="v">100</span></span>
+          </div>
+        </div>
+
+        <div class="idle-right">
+          <span class="next-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M12 7v5l3 2"/>
+            </svg>
+            Next in <span class="next-eta">1h&nbsp;47m</span>
+          </span>
+          <button class="btn btn-primary" type="button">
+            Run pipeline
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14M13 5l7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="disclosure-row">
+        <svg class="disclosure-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6"/>
+        </svg>
+        Hide history
+        <span class="count"><b>127</b> runs · last 30 days</span>
+      </div>
+
+      <!-- ============== HISTORY DRAWER ============== -->
+      <div class="history">
+        <div class="history-head">
+          <span class="history-title">Recent pipeline runs · <b>showing&nbsp;6</b> of 127</span>
+          <div class="history-filter">
+            <button type="button" class="on">All</button>
+            <button type="button">Manual</button>
+            <button type="button">Scheduled</button>
+          </div>
+        </div>
+
+        <div class="history-list">
+
+          <!-- 1 · manual · complete -->
+          <div class="run ok">
+            <span class="trigger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                <rect x="2.5" y="6.5" width="19" height="11" rx="1.5"/>
+                <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>
+              </svg>
+              Manual
+            </span>
+            <span class="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12l5 5L20 7"/>
+              </svg>
+            </span>
+            <span class="time">23m ago <span class="rel">13:42</span></span>
+            <span class="dur">8m 12s</span>
+            <span class="counts">
+              fetched <b>41</b><span class="sep">·</span>analyzed <b>100</b><span class="sep">·</span>summarized <b>100</b>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l6 6-6 6"/>
+            </svg>
+          </div>
+
+          <!-- 2 · scheduler · complete -->
+          <div class="run ok">
+            <span class="trigger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3 2"/>
+              </svg>
+              Cron
+            </span>
+            <span class="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12l5 5L20 7"/>
+              </svg>
+            </span>
+            <span class="time">2h ago <span class="rel">12:00</span></span>
+            <span class="dur">6m 04s</span>
+            <span class="counts">
+              fetched <b>12</b><span class="sep">·</span>analyzed <b>100</b><span class="sep">·</span>summarized <b>100</b>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l6 6-6 6"/>
+            </svg>
+          </div>
+
+          <!-- 3 · scheduler · complete -->
+          <div class="run ok">
+            <span class="trigger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3 2"/>
+              </svg>
+              Cron
+            </span>
+            <span class="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12l5 5L20 7"/>
+              </svg>
+            </span>
+            <span class="time">4h ago <span class="rel">10:00</span></span>
+            <span class="dur">5m 51s</span>
+            <span class="counts">
+              fetched <b>18</b><span class="sep">·</span>analyzed <b>100</b><span class="sep">·</span>summarized <b>100</b>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l6 6-6 6"/>
+            </svg>
+          </div>
+
+          <!-- 4 · manual · CANCELLED (expanded) -->
+          <div class="run cancelled is-open">
+            <span class="trigger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                <rect x="2.5" y="6.5" width="19" height="11" rx="1.5"/>
+                <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>
+              </svg>
+              Manual
+            </span>
+            <span class="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <line x1="6.4" y1="6.4" x2="17.6" y2="17.6" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="time">Yesterday <span class="rel">18:02</span></span>
+            <span class="dur">3m 18s</span>
+            <span class="counts">
+              fetched <b>41</b><span class="sep">·</span>analyzed <b>23</b>/100<span class="sep">·</span><span class="muted">summarized —</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l6 6-6 6"/>
+            </svg>
+            <div class="run-detail">
+              <div class="drow"><span class="dk">Cancelled by</span><span class="dv">user · 18:05:22 — 77 articles remained in analyze queue, summarize phase not started</span></div>
+              <div class="drow"><span class="dk">Phases reached</span><span class="dv">Fetch ✓ · Analyze 23/100 · Summarize —</span></div>
+              <div class="drow"><span class="dk">Run id</span><span class="dv">4b8f21e0-3c71-4a9d-9e12-6a2e9c0f45a1</span></div>
+            </div>
+          </div>
+
+          <!-- 5 · scheduler · FAILED (expanded) -->
+          <div class="run failed is-open">
+            <span class="trigger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3 2"/>
+              </svg>
+              Cron
+            </span>
+            <span class="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M6 18L18 6"/>
+              </svg>
+            </span>
+            <span class="time">Yesterday <span class="rel">16:00</span></span>
+            <span class="dur">0m 12s</span>
+            <span class="counts">
+              <span class="muted">fetched —</span><span class="sep">·</span><span class="muted">analyzed —</span><span class="sep">·</span><span class="muted">summarized —</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l6 6-6 6"/>
+            </svg>
+            <div class="run-detail">
+              <div class="drow"><span class="dk">Failed at</span><span class="dv err">fetch:Google AI Blog — ECONNREFUSED 142.251.32.78:443</span></div>
+              <div class="drow"><span class="dk">Trace</span><span class="dv">RequestError: connect ECONNREFUSED at TCPConnectWrap.afterConnect (node:net:1595:16)</span></div>
+              <div class="drow"><span class="dk">Retries</span><span class="dv">0 of 0 (scheduler does not auto-retry on fetch failure)</span></div>
+            </div>
+          </div>
+
+          <!-- 6 · scheduler · complete -->
+          <div class="run ok">
+            <span class="trigger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3 2"/>
+              </svg>
+              Cron
+            </span>
+            <span class="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12l5 5L20 7"/>
+              </svg>
+            </span>
+            <span class="time">Yesterday <span class="rel">14:00</span></span>
+            <span class="dur">7m 40s</span>
+            <span class="counts">
+              fetched <b>8</b><span class="sep">·</span>analyzed <b>100</b><span class="sep">·</span>summarized <b>100</b>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l6 6-6 6"/>
+            </svg>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

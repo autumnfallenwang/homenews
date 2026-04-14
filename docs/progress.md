@@ -75,14 +75,34 @@ See [ui-design-memo.md](ui-design-memo.md) for the design rationale, aesthetic d
 | 35 | Theme setting | Done | `theme` setting key (light/dark/system) in DB, ThemeApplier client component with system-mode media query listener, cookie hydration via SSR layout, Theme tab in settings sidebar with 3-option grid |
 | 36 | Feeds in settings | Done | FeedList moved into `07 FEEDS` tab via `FeedsSection` wrapper, top-nav Feeds link dropped, `/feeds` redirects to `/settings?tab=feeds` |
 
-## Phase 8: Pipeline tuning
+## Phase 8: Pipeline tuning (CLOSED — hotfixes only)
 
-Triggered by a diagnostic pass on 2026-04-13 that revealed the analyze queue was starving non-OpenAI feeds and the `/ranked` endpoint was dominated by historical articles. Hotfixes for the acute bugs are tracked in [changelog.md](changelog.md); the entries below are the design-level follow-ups that need decisions before implementation.
+Triggered by a diagnostic pass on 2026-04-13 that revealed the analyze queue was starving non-OpenAI feeds and the `/ranked` endpoint was dominated by historical articles. Root cause was the analyze query (missing `ORDER BY`, no date filter) — fixed in the hotfixes logged in [changelog.md](changelog.md). The design-level follow-ups that were originally scoped as tasks 37/38 were closed after the hotfixes landed because the behavior they were meant to address no longer exists.
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 37 | Historical backfill policy | Not started | Decide retention/cleanup for pre-seed articles (OpenAI goes back to 2015, HF to 2020). Option A: purge unanalyzed rows older than N days. Option B: leave them, rely on analyze-side date filter from hotfix. Needs design memo. |
-| 38 | Ranked recency filter | Not started | `/ranked` currently returns analyzed articles regardless of age. Composite score already has a freshness weight — decide whether to also add a hard `published_at` cutoff at query time, or tune λ instead. Needs design memo. |
+| 37 | Historical backfill policy | Won't do | The 14-day analyze filter (hotfix #1) already prevents LLM spend on old rows. Purging the ~2500 historical unanalyzed rows is disk/tidiness work with no behavior impact at this scale. Revisit only if row counts become a real problem. |
+| 38 | Ranked recency filter | Won't do | Composite score already owns recency via `weight_freshness * EXP(-λh)`. Adding a hard cutoff in `/ranked` would be a second mechanism for the same concern and create edge effects at the boundary. If old articles still dominate after the analyze fan-out, tune `freshness_lambda` in settings instead (runtime-tunable, no code change). |
+
+## Phase 9: Pipeline observability
+
+See [phase9-observability-memo.md](phase9-observability-memo.md) for the SSE-vs-polling decision, cancel semantics, and the "scheduler shares the same orchestrator" architectural choice. Design reference at [phase9-pipeline-ops-mockup.html](phase9-pipeline-ops-mockup.html) — open in a browser to see the three production states (idle / running / history-open) in the newsroom-workstation aesthetic.
+
+Triggered by the observation that an 8-minute pipeline run leaves the user staring at an unchanging spinner with no signal about progress, phase, cancellability, or history. Scope: single Run button with real per-article progress via SSE, explicit cancel, persistent run history shared by manual and scheduler runs, next-run countdown computed from the cron expression. Not in scope: job queues, persistent event storage, retry/resume, WebSockets.
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 39 | `pipeline_runs` schema + drizzle migration | Not started | Columns: id, trigger (manual\|scheduler), status (running\|completed\|cancelled\|failed), started_at, ended_at, duration_ms, fetch_added, fetch_errors, analyze_analyzed, analyze_errors, summarize_summarized, summarize_errors, error_message |
+| 40 | `services/pipeline.ts` orchestrator | Not started | Single `runPipelineWithProgress(trigger, onProgress?, signal?)` function. In-memory `activeRuns: Map<id, { cancel: boolean }>`. Writes start + final rows. Used by both SSE endpoint and scheduler. |
+| 41 | Thread `onProgress` + cancel signal into `analyze.ts` and `summarize.ts` | Not started | Optional params; emit `{ index, total, title, feedName }` between articles, check signal before each LLM call. Completes in-flight call before breaking on cancel (no mid-call abort). |
+| 42 | Scheduler refactor to call `runPipelineWithProgress(trigger="scheduler")` | Not started | Scheduler stops calling fetch/analyze/summarize directly — all cron ticks now land in `pipeline_runs` history. |
+| 43 | `services/cron-next.ts` + `cron-parser` dependency | Not started | Computes next-fire time from current `fetch_interval` setting. Shared by scheduler and status endpoint. |
+| 44 | API surface: replace 4 pipeline POSTs with 4 observability endpoints | Not started | `GET /admin/pipeline/stream` (SSE), `POST /admin/pipeline/runs/:id/cancel`, `GET /admin/pipeline/runs?limit=20&trigger=`, `GET /admin/pipeline/status` (active run + next-scheduled timestamp). Old fetch/analyze/summarize/run-all POSTs removed. |
+| 45 | `PipelineControl` rewrite — idle / running / done state machine | Not started | Owns EventSource connection. Single Run button morphs into Cancel during active run. Phase indicator with 3 columns, live article ticker (Fraunces italic), elapsed chronometer, accumulating totals. Reference: [phase9-pipeline-ops-mockup.html](phase9-pipeline-ops-mockup.html). |
+| 46 | `PipelineHistory` drawer component | Not started | Collapsible under the main strip via disclosure row. Segmented filter (All/Manual/Scheduled), hairline row list with click-to-expand failure/cancellation detail. Polls `/admin/pipeline/runs` on mount + window focus + 60s interval while tab visible. |
+| 47 | Next-scheduled countdown ticker | Not started | Computed client-side from `fetch_interval` setting, 30s `setInterval`. Authoritative next-run timestamp comes from `GET /admin/pipeline/status` at mount to avoid clock drift. |
+| 48 | Tests: `pipeline.test.ts` — cancellation + progress callback + phase boundaries | Not started | Unit tests for orchestrator; SSE event ordering verified via direct call to the service. |
+| 49 | Drop obsolete helpers in `apps/web/src/lib/api.ts` | Not started | Remove the 4 old `triggerPipeline*` helpers. Add `fetchPipelineStatus()`, `fetchPipelineRuns()`, `cancelPipelineRun(id)`. |
 
 ## What's Working
 
@@ -109,7 +129,7 @@ Triggered by a diagnostic pass on 2026-04-13 that revealed the analyze queue was
 
 ## What's Next
 
-Phase 7 complete. Pipeline hotfixes landing now (see [changelog.md](changelog.md)); Phase 8 tasks 37–38 need design memos before implementation.
+Phase 9: Pipeline observability — plan + design reference locked. Design memo at [phase9-observability-memo.md](phase9-observability-memo.md), visual reference at [phase9-pipeline-ops-mockup.html](phase9-pipeline-ops-mockup.html). Ready to implement starting at task 39 (DB schema). Implementation order is strict: schema → orchestrator → service threading → scheduler refactor → cron util → API → frontend → tests. Each step gates the next.
 
 ## Reference Docs
 
