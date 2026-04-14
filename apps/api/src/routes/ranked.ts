@@ -45,15 +45,28 @@ function buildFreshnessExpr(lambda: number) {
 
 function buildCompositeExpr(s: CompositeSettings) {
   const freshness = buildFreshnessExpr(s.freshness_lambda);
+  // Normalize by the sum of weights so the composite is always bounded 0-1
+  // (i.e. always 0-100 when multiplied for display). Only the RATIOS between
+  // weights matter to the ranking — users can tune one weight without
+  // having to rebalance the others to keep them summing to 1.
+  // Guarded against zero-sum via `NULLIF ... || 1` so a pathological all-zero
+  // weights config returns 0 instead of divide-by-zero.
+  const totalWeight =
+    s.weight_relevance +
+    s.weight_importance +
+    s.weight_freshness +
+    s.weight_authority +
+    s.weight_uniqueness;
+  const divisor = totalWeight > 0 ? totalWeight : 1;
   // All weight params cast to ::double precision so PG can pick the right multiplication operator.
   // Uniqueness is hardcoded to 1.0 for now — real uniqueness signal deferred.
-  return sql<number>`
+  return sql<number>`(
     ${s.weight_relevance}::double precision * (${articleAnalysisWithFeed.relevance}::double precision / 100)
     + ${s.weight_importance}::double precision * (${articleAnalysisWithFeed.importance}::double precision / 100)
     + ${s.weight_freshness}::double precision * ${freshness}
     + ${s.weight_authority}::double precision * ${articleAnalysisWithFeed.feedAuthorityScore}
     + ${s.weight_uniqueness}::double precision * 1.0
-  `;
+  ) / ${divisor}::double precision`;
 }
 
 type RankedRow = {

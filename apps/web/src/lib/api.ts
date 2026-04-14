@@ -20,13 +20,16 @@ export async function fetchRanked(params?: {
   if (params?.offset) url.searchParams.set("offset", String(params.offset));
   if (params?.minScore) url.searchParams.set("minScore", String(params.minScore));
 
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  // Always fetch fresh — composite scores depend on live settings that can
+  // change between runs, and Next.js's 300s ISR cache was hiding those
+  // changes from the dashboard.
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch ranked articles: ${res.status}`);
   return res.json();
 }
 
 export async function fetchRankedArticle(id: string): Promise<AnalyzedArticle | null> {
-  const res = await fetch(`${API_URL}/ranked/${id}`, { next: { revalidate: 300 } });
+  const res = await fetch(`${API_URL}/ranked/${id}`, { cache: "no-store" });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Failed to fetch ranked article: ${res.status}`);
   return res.json();

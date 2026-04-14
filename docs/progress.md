@@ -129,6 +129,14 @@ Small follow-up to Phase 10. Current `summarizeUnsummarized()` has no `ORDER BY`
 | 57 | `summarize.ts` query rewrite | Done | Added `SUMMARIZE_MAX_AGE_DAYS = 14` constant (same window as analyze). Extended the query with `and(isNull(llmSummary), eq(feeds.enabled, true), inWindow)` and `.orderBy(desc(relevance + importance), desc(publishedAt))`. Value-first priority using SQL `(relevance + importance)` composite, fresher content wins on ties. No per-feed allocation — analyze already distributed state-2 rows fairly. 186 tests still passing. |
 | 58 | Changelog entry | Done | 2026-04-14 `feat(summarize)` entry explaining value-first policy + graceful degradation. |
 
+## Phase 12: Active run re-attach on mount (COMPLETE)
+
+Fix for: navigating away from the dashboard during a manual run and returning makes PipelineControl show as idle with no cancel button, even though the backend run is still in progress. Root cause: EventSource closes on unmount and can't be re-attached to an in-flight run (the `/stream` endpoint is one-shot). Frontend-only fix via polling `/status` and rendering a "watching" sub-state with reduced info.
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 59 | Watching sub-state in `PipelineControl` | Done | On mount (or after navigation return), if `status.activeRun != null`, render a stripped-down running view: state badge + elapsed chronometer + trigger chip + Cancel button. No phase indicator, no article ticker, no progress bar (those require the live EventSource which only the originating tab has). Added a 5s polling effect on `/status` scoped to watching state, a guard effect that resets `cancelling` when `activeRun` clears, and extended the elapsed-clock interval to fire while watching. New `cancelWatchingRun()` handler POSTs to `/runs/:id/cancel` using the runId from `status.activeRun`. `showRunningChrome` boolean combines owned-run + watching to apply the amber rail and wash in both cases. Dashboard bundle 8.89 → 9.09 kB. |
+
 ## What's Working
 
 - POC: RSS feed fetching validated (14/14 AI sources working, see poc/ folder)
@@ -154,7 +162,7 @@ Small follow-up to Phase 10. Current `summarizeUnsummarized()` has no `ORDER BY`
 
 ## What's Next
 
-Phases 10-11 complete. All three pipeline layers (fetch / analyze / summarize) now have well-defined pickup policies matching [pipeline-flow.md](pipeline-flow.md). Still unsolved: Google AI Blog fetch error (next manual run will surface it via the Task 54 per-feed log loop). Next direction TBD.
+Phases 10-12 complete. All three pipeline layers have well-defined pickup policies ([pipeline-flow.md](pipeline-flow.md)), and the dashboard now re-attaches to in-flight runs when the user navigates back. Still unsolved: Google AI Blog fetch error (next manual run will surface it via the Task 54 per-feed log loop). Next direction TBD.
 
 ## Reference Docs
 

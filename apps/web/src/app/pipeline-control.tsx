@@ -210,12 +210,38 @@ export function PipelineControl() {
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  // Elapsed clock — runs only while a run is active
+  // Elapsed clock — runs while we own a run OR while we're watching an
+  // externally-owned active run (from another tab / navigation return).
   useEffect(() => {
-    if (!run) return;
+    const needsClock = run !== null || status?.activeRun != null;
+    if (!needsClock) return;
     const interval = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [run]);
+  }, [run, status?.activeRun]);
+
+  // Watching-mode status polling: re-fetch /status every 5s while we're
+  // watching an externally-owned run, so we transition back to idle
+  // promptly when the run ends (cancelled, completed, or failed).
+  useEffect(() => {
+    if (run !== null) return;
+    if (status?.activeRun == null) return;
+    const interval = setInterval(() => {
+      fetchPipelineStatus()
+        .then(setStatus)
+        .catch(() => {
+          /* best-effort */
+        });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [run, status?.activeRun]);
+
+  // Reset the cancelling flag once the active run actually disappears
+  // (either because we cancelled it or because it finished naturally).
+  useEffect(() => {
+    if (status?.activeRun == null && cancelling && run === null) {
+      setCancelling(false);
+    }
+  }, [status?.activeRun, cancelling, run]);
 
   // Cleanup EventSource on unmount
   useEffect(() => {
@@ -282,21 +308,37 @@ export function PipelineControl() {
     }
   }
 
+  // Cancel from the "watching" sub-state — we don't own an EventSource,
+  // so we POST cancel via the runId from status.activeRun and wait for
+  // the next /status poll to transition us back to idle.
+  async function cancelWatchingRun() {
+    const activeId = status?.activeRun?.id;
+    if (!activeId || cancelling) return;
+    setCancelling(true);
+    try {
+      await cancelPipelineRun(activeId);
+    } catch (err) {
+      console.error("Cancel failed:", err);
+      setCancelling(false);
+    }
+  }
+
   const isRunning = run !== null;
-  const externalRunActive =
-    !isRunning && status?.activeRun !== null && status?.activeRun !== undefined;
+  const isWatching = !isRunning && status?.activeRun != null;
+
+  const showRunningChrome = isRunning || isWatching;
 
   return (
     <section
       aria-label="Pipeline control"
       className={cn(
         "relative border-y border-border",
-        isRunning ? "pipeline-running-wash" : "bg-card/40",
+        showRunningChrome ? "pipeline-running-wash" : "bg-card/40",
       )}
-      data-state={isRunning ? "running" : "idle"}
+      data-state={showRunningChrome ? "running" : "idle"}
     >
-      {/* Amber rail when running */}
-      {isRunning && (
+      {/* Amber rail when running OR watching an external run */}
+      {showRunningChrome && (
         <div
           className="pointer-events-none absolute inset-y-0 left-0 w-[2px] bg-primary"
           aria-hidden
@@ -327,7 +369,13 @@ export function PipelineControl() {
             onCancel={cancelRun}
           />
         ) : (
-          <IdleView status={status} busy={externalRunActive} onRun={startRun} />
+          <IdleView
+            status={status}
+            nowTick={nowTick}
+            cancelling={cancelling}
+            onRun={startRun}
+            onCancelWatching={cancelWatchingRun}
+          />
         )}
       </div>
 
@@ -354,27 +402,59 @@ export function PipelineControl() {
   );
 }
 
-// --- Idle view ---
+// --- Idle view (also renders the "watching external run" sub-state) ---
 
 function IdleView({
   status,
-  busy,
+  nowTick,
+  cancelling,
   onRun,
+  onCancelWatching,
 }: {
   status: PipelineStatus | null;
-  busy: boolean;
+  nowTick: number;
+  cancelling: boolean;
   onRun: () => void;
+  onCancelWatching: () => void;
 }) {
+  const activeRun = status?.activeRun ?? null;
   const last = status?.lastRun ?? null;
 
-  let middle: React.ReactNode;
-  if (busy) {
-    middle = (
-      <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">
-        Scheduled run in progress · watching via status poll
-      </span>
+  // ── Watching sub-state: an external run is active but we don't own
+  //    its EventSource. Show elapsed + trigger + cancel, no phase/ticker.
+  if (activeRun) {
+    const elapsedMs = Math.max(0, nowTick - new Date(activeRun.startedAt).getTime());
+    const elapsed = formatElapsed(elapsedMs);
+    const [mm, ss] = elapsed.split(":");
+    return (
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <StateBadge kind="running" />
+
+        <div className="flex items-baseline gap-3 border-l border-border/60 pl-5">
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+            Elapsed
+          </span>
+          <span className="tabular font-mono text-[22px] font-medium leading-none text-foreground">
+            {mm}
+            <span className="pipeline-colon-blink text-primary">:</span>
+            {ss}
+          </span>
+        </div>
+
+        <div className="flex min-w-0 flex-1 items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          <TriggerChip trigger={activeRun.trigger} />
+          <span className="text-muted-foreground/50">·</span>
+          <span className="truncate">Live progress only in the tab that started this run</span>
+        </div>
+
+        <CancelButton cancelling={cancelling} onClick={onCancelWatching} />
+      </div>
     );
-  } else if (last) {
+  }
+
+  // ── Normal idle state ──
+  let middle: React.ReactNode;
+  if (last) {
     middle = <LastRunSummary last={last} />;
   } else {
     middle = (
@@ -392,7 +472,7 @@ function IdleView({
 
       <div className="flex items-center gap-3">
         {status?.nextRunAt && <NextPill nextRunAt={status.nextRunAt} />}
-        <RunButton onClick={onRun} disabled={busy} />
+        <RunButton onClick={onRun} disabled={false} />
       </div>
     </div>
   );
