@@ -139,6 +139,32 @@ export const articleInteractions = pgTable(
   ],
 );
 
+// Phase 14B — per-article highlights. Text-selection captures from the
+// article detail page. `text` is non-null (a highlight without selected
+// text is meaningless); `note` is optional annotation; char offsets are
+// optional DOM anchors for future re-rendering. `user_id` nullable for
+// single-user mode + forward-compat multi-user.
+export const articleHighlights = pgTable(
+  "article_highlights",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => articles.id, { onDelete: "cascade" }),
+    userId: uuid("user_id"),
+    text: text("text").notNull(),
+    note: text("note"),
+    charStart: integer("char_start"),
+    charEnd: integer("char_end"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("article_highlights_article_idx").on(table.articleId),
+    index("article_highlights_user_idx").on(table.userId),
+    index("article_highlights_created_idx").on(table.createdAt.desc()),
+  ],
+);
+
 // View: joins for ranked API queries. No math here — composite score is computed
 // in the query layer using settings-driven weights (see Task 22).
 export const articleAnalysisWithFeed = pgView("article_analysis_with_feed").as((qb) =>

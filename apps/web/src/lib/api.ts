@@ -1,8 +1,11 @@
 import type {
   AnalyzedArticle,
+  ArticleHighlight,
   ArticleInteraction,
+  CreateArticleHighlight,
   CreateFeed,
   Feed,
+  HighlightWithArticle,
   PipelineRun,
   PipelineStatus,
   RankedResponse,
@@ -78,6 +81,46 @@ export async function updateArticleInteraction(
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Failed to update article interaction: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchArticleHighlights(articleId: string): Promise<ArticleHighlight[]> {
+  const res = await fetch(`${API_URL}/articles/${articleId}/highlights`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch highlights: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchAllHighlights(params?: {
+  limit?: number;
+  offset?: number;
+}): Promise<HighlightWithArticle[]> {
+  const url = new URL(`${API_URL}/highlights`);
+  if (params?.limit !== undefined) url.searchParams.set("limit", String(params.limit));
+  if (params?.offset !== undefined) url.searchParams.set("offset", String(params.offset));
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch highlights: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteArticleHighlight(highlightId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/highlights/${highlightId}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Failed to delete highlight: ${res.status}`);
+}
+
+export async function createArticleHighlight(
+  articleId: string,
+  body: CreateArticleHighlight,
+): Promise<ArticleHighlight> {
+  const res = await fetch(`${API_URL}/articles/${articleId}/highlights`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Failed to create highlight: ${res.status}`);
   return res.json();
 }
 

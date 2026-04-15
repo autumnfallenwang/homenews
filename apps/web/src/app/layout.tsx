@@ -60,6 +60,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </Link>
             <nav className="flex items-center gap-1 text-[13px]">
               <NavLink href="/" label="Dashboard" />
+              <NavLink href="/highlights" label="Highlights" />
               <NavLink href="/settings" label="Settings" />
             </nav>
             <div className="ml-auto flex items-center gap-3">

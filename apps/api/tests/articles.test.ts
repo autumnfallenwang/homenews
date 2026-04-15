@@ -200,6 +200,87 @@ describe("PATCH /articles/:id/interaction", () => {
   });
 });
 
+// biome-ignore lint/security/noSecrets: UUID constant
+const HIGHLIGHT_ID = "33333333-3333-3333-3333-333333333333";
+
+const highlightRow = {
+  id: HIGHLIGHT_ID,
+  articleId: ARTICLE_ID,
+  userId: null,
+  text: "Mixture-of-experts routing can be decoupled from the reasoning core.",
+  note: "worth revisiting",
+  charStart: 120,
+  charEnd: 190,
+  createdAt: new Date("2026-04-14T11:00:00Z"),
+};
+
+describe("GET /articles/:id/highlights", () => {
+  it("returns empty array when no highlights exist", async () => {
+    selectResults = [[{ id: ARTICLE_ID }], []];
+    const res = await app.request(`/articles/${ARTICLE_ID}/highlights`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toEqual([]);
+  });
+
+  it("returns list of highlights for the article", async () => {
+    selectResults = [[{ id: ARTICLE_ID }], [highlightRow]];
+    const res = await app.request(`/articles/${ARTICLE_ID}/highlights`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toHaveLength(1);
+    expect(data[0].id).toBe(HIGHLIGHT_ID);
+    expect(data[0].text).toContain("routing");
+    expect(data[0].note).toBe("worth revisiting");
+    expect(data[0].charStart).toBe(120);
+    expect(typeof data[0].createdAt).toBe("string");
+  });
+
+  it("returns 404 when article not found", async () => {
+    selectResults = [[]];
+    const res = await app.request(`/articles/${MISSING_ID}/highlights`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /articles/:id/highlights", () => {
+  it("creates a highlight with text and note", async () => {
+    selectResults = [[{ id: ARTICLE_ID }]];
+    mockReturning.mockResolvedValueOnce([highlightRow]);
+
+    const res = await app.request(`/articles/${ARTICLE_ID}/highlights`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: highlightRow.text, note: "worth revisiting" }),
+    });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.id).toBe(HIGHLIGHT_ID);
+    expect(data.note).toBe("worth revisiting");
+  });
+
+  it("rejects empty text with 400", async () => {
+    const res = await app.request(`/articles/${ARTICLE_ID}/highlights`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "" }),
+    });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation failed");
+  });
+
+  it("returns 404 when article not found", async () => {
+    selectResults = [[]];
+    const res = await app.request(`/articles/${MISSING_ID}/highlights`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "a highlight" }),
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("POST /articles/:id/interaction/view", () => {
   it("creates interaction with viewedAt when none exists", async () => {
     selectResults = [[{ id: ARTICLE_ID }], []];

@@ -220,6 +220,53 @@ export const updateArticleInteractionSchema = z.object({
 });
 export type UpdateArticleInteraction = z.infer<typeof updateArticleInteractionSchema>;
 
+// --- Article highlights (Phase 14B) ---
+// Passage-level captures from the article detail page. Full schema mirrors
+// the DB row; create schema is the POST body. Highlights are append-only +
+// delete-only at this phase — no update schema until note editing becomes
+// a real feature request.
+
+export const articleHighlightSchema = z.object({
+  id: z.string().uuid(),
+  articleId: z.string().uuid(),
+  userId: z.string().uuid().nullable(),
+  text: z.string(),
+  note: z.string().nullable(),
+  charStart: z.number().int().nullable(),
+  charEnd: z.number().int().nullable(),
+  createdAt: z.string(),
+});
+export type ArticleHighlight = z.infer<typeof articleHighlightSchema>;
+
+export const createArticleHighlightSchema = z.object({
+  text: z.string().min(1, "highlight text cannot be empty"),
+  note: z.string().nullable().optional(),
+  charStart: z.number().int().min(0).optional(),
+  charEnd: z.number().int().min(0).optional(),
+});
+export type CreateArticleHighlight = z.infer<typeof createArticleHighlightSchema>;
+
+// Cross-article highlight list response shape. Joins article metadata so the
+// /highlights route can render each card with its article context + link
+// back to the reader-mode detail page. `analysisId` is the article_analysis
+// UUID (used for the /article/[id] URL), distinct from `articleId` which is
+// the articles.id UUID.
+export const highlightWithArticleSchema = z.object({
+  id: z.string().uuid(),
+  articleId: z.string().uuid(),
+  text: z.string(),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+  article: z.object({
+    analysisId: z.string().uuid(),
+    title: z.string(),
+    link: z.url(),
+    feedName: z.string(),
+    publishedAt: z.string().nullable(),
+  }),
+});
+export type HighlightWithArticle = z.infer<typeof highlightWithArticleSchema>;
+
 // --- Ranked query + response (Phase 13) ---
 // Server-side filtering for GET /ranked. See phase13-server-filtering-memo.md
 // for the full locked design. The query schema runs against URL search params,

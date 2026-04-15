@@ -1,12 +1,14 @@
 import {
+  type ArticleHighlight,
   type ArticleInteraction,
+  createArticleHighlightSchema,
   type UpdateArticleInteraction,
   updateArticleInteractionSchema,
 } from "@homenews/shared";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/index.js";
-import { articleInteractions, articles } from "../db/schema.js";
+import { articleHighlights, articleInteractions, articles } from "../db/schema.js";
 
 const app = new Hono();
 
@@ -169,6 +171,69 @@ app.post("/:id/interaction/view", async (c) => {
   }
 
   return c.json({ ok: true });
+});
+
+// ── Article highlights (Phase 14B) ─────────────────────────
+
+type HighlightRow = typeof articleHighlights.$inferSelect;
+
+function toHighlightResponse(row: HighlightRow): ArticleHighlight {
+  return {
+    id: row.id,
+    articleId: row.articleId,
+    userId: row.userId,
+    text: row.text,
+    note: row.note,
+    charStart: row.charStart,
+    charEnd: row.charEnd,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+  };
+}
+
+// List highlights for an article, newest first.
+app.get("/:id/highlights", async (c) => {
+  const id = c.req.param("id");
+
+  if (!(await articleExists(id))) {
+    return c.json({ error: "Article not found" }, 404);
+  }
+
+  const rows = await db
+    .select()
+    .from(articleHighlights)
+    .where(and(eq(articleHighlights.articleId, id), isNull(articleHighlights.userId)))
+    .orderBy(desc(articleHighlights.createdAt));
+
+  return c.json(rows.map(toHighlightResponse));
+});
+
+// Create a highlight on an article.
+app.post("/:id/highlights", async (c) => {
+  const id = c.req.param("id");
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = createArticleHighlightSchema.safeParse(body ?? {});
+  if (!parsed.success) {
+    return c.json({ error: "Validation failed", issues: parsed.error.issues }, 400);
+  }
+
+  if (!(await articleExists(id))) {
+    return c.json({ error: "Article not found" }, 404);
+  }
+
+  const [inserted] = await db
+    .insert(articleHighlights)
+    .values({
+      articleId: id,
+      userId: null,
+      text: parsed.data.text,
+      note: parsed.data.note ?? null,
+      charStart: parsed.data.charStart ?? null,
+      charEnd: parsed.data.charEnd ?? null,
+    })
+    .returning();
+
+  return c.json(toHighlightResponse(inserted), 201);
 });
 
 export default app;

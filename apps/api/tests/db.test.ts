@@ -2,6 +2,7 @@ import { getTableColumns, getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
   articleAnalysis,
+  articleHighlights,
   articleInteractions,
   articles,
   feeds,
@@ -168,6 +169,35 @@ describe("article_interactions table", () => {
     expect(cols.readAt.notNull).toBe(false);
     expect(cols.note.notNull).toBe(false);
     expect(cols.readingSeconds.notNull).toBe(false);
+  });
+});
+
+describe("article_highlights table", () => {
+  it("has correct table name", () => {
+    expect(getTableName(articleHighlights)).toBe("article_highlights");
+  });
+
+  it("has all expected columns", () => {
+    const cols = getTableColumns(articleHighlights);
+    expect(Object.keys(cols).sort()).toEqual(
+      ["id", "articleId", "userId", "text", "note", "charStart", "charEnd", "createdAt"].sort(),
+    );
+  });
+
+  it("has notNull on required columns", () => {
+    const cols = getTableColumns(articleHighlights);
+    expect(cols.id.notNull).toBe(true);
+    expect(cols.articleId.notNull).toBe(true);
+    expect(cols.text.notNull).toBe(true);
+    expect(cols.createdAt.notNull).toBe(true);
+  });
+
+  it("allows null on optional columns", () => {
+    const cols = getTableColumns(articleHighlights);
+    expect(cols.userId.notNull).toBe(false);
+    expect(cols.note.notNull).toBe(false);
+    expect(cols.charStart.notNull).toBe(false);
+    expect(cols.charEnd.notNull).toBe(false);
   });
 });
 

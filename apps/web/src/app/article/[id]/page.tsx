@@ -2,9 +2,11 @@ import { ALLOWED_TAGS } from "@homenews/shared";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { fetchArticleInteraction, fetchRankedArticle } from "@/lib/api";
+import { fetchArticleHighlights, fetchArticleInteraction, fetchRankedArticle } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ArticleTagsRow } from "./article-tags-row";
+import { HighlightCaptureContent } from "./highlight-capture-content";
+import { HighlightsList } from "./highlights-list";
 import { InteractionPanel } from "./interaction-panel";
 
 function formatDate(dateStr: string | null): string {
@@ -40,6 +42,8 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   // analysis UUID. Sequential fetch because we need `item.articleId` first;
   // the ~20ms cost is invisible. Fall back to a synthetic default if the API
   // is unreachable so the detail page still renders.
+  const highlights = await fetchArticleHighlights(item.articleId).catch(() => []);
+
   const interaction = await fetchArticleInteraction(item.articleId).catch(() => ({
     id: null,
     articleId: item.articleId,
@@ -127,11 +131,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
       {/* Body — reader mode content, or failure / pending notice */}
       <div className="mt-12">
         {hasBody ? (
-          <article
-            className="reader-content"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: extracted HTML comes from our own server via Mozilla Readability; scripts stripped
-            dangerouslySetInnerHTML={{ __html: extractedContent as string }}
-          />
+          <HighlightCaptureContent articleId={item.articleId} html={extractedContent as string} />
         ) : (
           <ExtractionNotice
             failed={extractionFailed}
@@ -140,6 +140,9 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           />
         )}
       </div>
+
+      {/* Highlights — saved passages from the reader body, with × remove */}
+      <HighlightsList highlights={highlights} />
 
       {/* Tags — merged LLM + user tags, one deduplicated editable row */}
       <div className="mt-12">
