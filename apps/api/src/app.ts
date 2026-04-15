@@ -5,6 +5,7 @@ import articlesApp from "./routes/articles.js";
 import feedsApp from "./routes/feeds.js";
 import highlightsApp from "./routes/highlights.js";
 import rankedApp from "./routes/ranked.js";
+import searchApp from "./routes/search.js";
 import settingsApp from "./routes/settings.js";
 
 const app = new Hono();
@@ -24,6 +25,7 @@ app.route("/feeds", feedsApp);
 app.route("/articles", articlesApp);
 app.route("/highlights", highlightsApp);
 app.route("/ranked", rankedApp);
+app.route("/search", searchApp);
 app.route("/settings", settingsApp);
 app.route("/admin", adminApp);
 

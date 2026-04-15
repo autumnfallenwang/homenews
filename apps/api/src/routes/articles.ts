@@ -9,6 +9,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/index.js";
 import { articleHighlights, articleInteractions, articles } from "../db/schema.js";
+import { embed } from "../services/embed.js";
 
 const app = new Hono();
 
@@ -221,6 +222,18 @@ app.post("/:id/highlights", async (c) => {
     return c.json({ error: "Article not found" }, 404);
   }
 
+  // Phase 15 Task 90: embed the highlight text synchronously before the
+  // INSERT so the vector lands in the same row. Best-effort — a failed
+  // embedding logs + writes `null` so the highlight still persists.
+  // Task 91 backfill picks up any highlights with null embedding.
+  let embedding: number[] | null = null;
+  try {
+    embedding = await embed(parsed.data.text);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[highlights] embedding failed for article ${id}: ${msg}`);
+  }
+
   const [inserted] = await db
     .insert(articleHighlights)
     .values({
@@ -230,6 +243,7 @@ app.post("/:id/highlights", async (c) => {
       note: parsed.data.note ?? null,
       charStart: parsed.data.charStart ?? null,
       charEnd: parsed.data.charEnd ?? null,
+      embedding,
     })
     .returning();
 

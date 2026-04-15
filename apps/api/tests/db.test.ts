@@ -72,6 +72,8 @@ describe("articles table", () => {
         "extractedContent",
         "extractedAt",
         "extractionStatus",
+        "searchTsv",
+        "embedding",
       ].sort(),
     );
   });
@@ -180,7 +182,17 @@ describe("article_highlights table", () => {
   it("has all expected columns", () => {
     const cols = getTableColumns(articleHighlights);
     expect(Object.keys(cols).sort()).toEqual(
-      ["id", "articleId", "userId", "text", "note", "charStart", "charEnd", "createdAt"].sort(),
+      [
+        "id",
+        "articleId",
+        "userId",
+        "text",
+        "note",
+        "charStart",
+        "charEnd",
+        "createdAt",
+        "embedding",
+      ].sort(),
     );
   });
 

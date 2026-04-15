@@ -174,3 +174,4 @@ DerivedData/
 poc/
 __pycache__/
 .venv/
+ops/

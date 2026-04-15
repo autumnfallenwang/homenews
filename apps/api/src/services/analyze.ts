@@ -2,6 +2,7 @@ import type { PipelineProgressEvent } from "@homenews/shared";
 import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { articleAnalysis, articles, feeds } from "../db/schema.js";
+import { embed } from "./embed.js";
 import { llmExecute } from "./llm-executor.js";
 import { extractArticle } from "./reader.js";
 import { getSetting } from "./settings.js";
@@ -262,6 +263,43 @@ async function ensureExtracted(article: {
   return null;
 }
 
+// ============================================================
+// Embedding (Phase 15 Task 89)
+// ============================================================
+
+/**
+ * Generate a semantic embedding for the article and persist it to
+ * `articles.embedding`. Called from the analyze loop AFTER the analysis
+ * row is committed, so a failed embedding never blocks the analysis
+ * result. Best-effort: errors are logged + swallowed, Task 91 backfill
+ * fills in any gaps later.
+ *
+ * Input text: title + first 500 chars of the extracted content preview
+ * (or just title when extraction failed). Over the full extracted_content
+ * would be wasteful for retrieval quality — the first few paragraphs
+ * carry the semantic signature of the article.
+ */
+const EMBEDDING_INPUT_CHARS = 500;
+
+async function ensureEmbedding(
+  articleId: string,
+  title: string,
+  contentPreview: string | null,
+): Promise<void> {
+  const snippet = contentPreview ? contentPreview.slice(0, EMBEDDING_INPUT_CHARS) : "";
+  const input = snippet ? `${title}\n${snippet}` : title;
+
+  try {
+    const vector = await embed(input);
+    await db.update(articles).set({ embedding: vector }).where(eq(articles.id, articleId));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[analyze] embedding failed for "${title}": ${msg}`);
+    // Swallow — the analysis row is already written; Task 91 backfill
+    // will pick up this article on the next reconciliation run.
+  }
+}
+
 export async function analyzeUnanalyzed(
   limit?: number,
   options: AnalyzeOptions = {},
@@ -425,6 +463,10 @@ export async function analyzeUnanalyzed(
         tags: result.tags,
       });
       analyzed++;
+      // Embedding is best-effort — runs AFTER the analysis insert so a
+      // gateway hiccup never blocks the analyze row from being committed.
+      // Internal try/catch swallows errors (Task 89).
+      await ensureEmbedding(article.id, article.title, contentPreview);
     } catch (err) {
       console.warn(
         `[analyze] Failed for "${article.title}": ${err instanceof Error ? err.message : String(err)}`,

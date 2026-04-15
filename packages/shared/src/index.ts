@@ -356,6 +356,99 @@ export const rankedResponseSchema = z.object({
 });
 export type RankedResponse = z.infer<typeof rankedResponseSchema>;
 
+// --- Search (Phase 15 Task 92) ---
+// Four modes (keyword via tsvector, fuzzy via pg_trgm, semantic via pgvector
+// cosine, hybrid via weighted combination) over three targets (articles,
+// highlights, or both). See phase15-find-memo.md for the full design.
+
+export const SEARCH_MODES = ["keyword", "fuzzy", "semantic", "hybrid"] as const;
+export type SearchMode = (typeof SEARCH_MODES)[number];
+
+export const SEARCH_TARGETS = ["all", "articles", "highlights"] as const;
+export type SearchTarget = (typeof SEARCH_TARGETS)[number];
+
+// Shared csvList pattern (mirrors the one in rankedQuerySchema — same
+// semantics: comma-separated string collapsed to `string[] | undefined`).
+const searchCsvList = z
+  .string()
+  .optional()
+  .transform((v) =>
+    v && v.length > 0
+      ? v
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined,
+  );
+
+export const searchQuerySchema = z.object({
+  q: z.string().min(1),
+  mode: z.enum(SEARCH_MODES).default("hybrid"),
+  target: z.enum(SEARCH_TARGETS).default("all"),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).max(10000).default(0),
+  sources: searchCsvList,
+  tags: searchCsvList,
+  published_at_gte: z.iso.datetime({ offset: true }).optional(),
+  published_at_lte: z.iso.datetime({ offset: true }).optional(),
+});
+export type SearchQuery = z.infer<typeof searchQuerySchema>;
+
+// Compact article context attached to every search result (both article and
+// highlight kinds). Distinct from AnalyzedArticle — search returns a smaller
+// shape focused on retrieval display.
+export const searchArticleSchema = z.object({
+  analysisId: z.string().uuid(),
+  articleId: z.string().uuid(),
+  title: z.string(),
+  link: z.url(),
+  feedName: z.string(),
+  publishedAt: z.string().nullable(),
+});
+export type SearchArticle = z.infer<typeof searchArticleSchema>;
+
+export const searchHighlightPayloadSchema = z.object({
+  id: z.string().uuid(),
+  text: z.string(),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type SearchHighlightPayload = z.infer<typeof searchHighlightPayloadSchema>;
+
+// `snippet` is a short text fragment with `<b>…</b>` marks around matched
+// terms, produced by `ts_headline` on the server. Populated for keyword and
+// hybrid modes; null for fuzzy (no position data) and semantic (no word-
+// level match). Web renders it via a small regex parser that maps `<b>`
+// to React `<mark>` elements — no dangerouslySetInnerHTML.
+export const searchResultSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("article"),
+    score: z.number(),
+    matchedMode: z.enum(SEARCH_MODES),
+    snippet: z.string().nullable(),
+    article: searchArticleSchema,
+  }),
+  z.object({
+    kind: z.literal("highlight"),
+    score: z.number(),
+    matchedMode: z.enum(SEARCH_MODES),
+    snippet: z.string().nullable(),
+    article: searchArticleSchema,
+    highlight: searchHighlightPayloadSchema,
+  }),
+]);
+export type SearchResult = z.infer<typeof searchResultSchema>;
+
+export const searchResponseSchema = z.object({
+  rows: z.array(searchResultSchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int(),
+  offset: z.number().int(),
+  query: z.string(),
+  mode: z.enum(SEARCH_MODES),
+});
+export type SearchResponse = z.infer<typeof searchResponseSchema>;
+
 // --- Allowed tag vocabulary (memo Q5) ---
 export const ALLOWED_TAGS = [
   // Topic areas
@@ -513,6 +606,14 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
     value: "gemma3:27b",
     type: "string",
     description: "Fallback LLM model for summarize task if primary fails",
+  },
+
+  // Embeddings (Phase 15)
+  embedding_model_name: {
+    value: "bge-m3",
+    type: "string",
+    description:
+      "Embedding model for semantic search. Changing this requires re-embedding existing content via the backfill job — dimensions must match the vector(1024) column.",
   },
 
   // UI theme

@@ -1,6 +1,7 @@
 import { eq, getTableColumns, sql } from "drizzle-orm";
 import {
   boolean,
+  customType,
   index,
   integer,
   pgTable,
@@ -10,7 +11,17 @@ import {
   timestamp,
   unique,
   uuid,
+  vector,
 } from "drizzle-orm/pg-core";
+
+// PG tsvector — drizzle doesn't ship a first-class type, but customType is
+// enough to keep the column represented in the schema so drizzle-kit push
+// doesn't try to drop it on subsequent runs. Phase 15 full-text search.
+const tsvector = customType<{ data: string; driverData: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 
 export const feeds = pgTable("feeds", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -27,26 +38,46 @@ export const feeds = pgTable("feeds", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const articles = pgTable("articles", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  feedId: uuid("feed_id")
-    .notNull()
-    .references(() => feeds.id),
-  title: text("title").notNull(),
-  link: text("link").notNull().unique(),
-  summary: text("summary"),
-  content: text("content"),
-  author: text("author"),
-  publishedAt: timestamp("published_at", { withTimezone: true }),
-  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
-  duplicateOfId: uuid("duplicate_of_id"),
-  // Phase 14 — reader mode cache. Populated during the analyze phase by
-  // services/reader.ts (Task 71). `extraction_status` is application-level
-  // enum: 'ok' | 'failed' | 'pending'.
-  extractedContent: text("extracted_content"),
-  extractedAt: timestamp("extracted_at", { withTimezone: true }),
-  extractionStatus: text("extraction_status"),
-});
+export const articles = pgTable(
+  "articles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    feedId: uuid("feed_id")
+      .notNull()
+      .references(() => feeds.id),
+    title: text("title").notNull(),
+    link: text("link").notNull().unique(),
+    summary: text("summary"),
+    content: text("content"),
+    author: text("author"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+    duplicateOfId: uuid("duplicate_of_id"),
+    // Phase 14 — reader mode cache. Populated during the analyze phase by
+    // services/reader.ts (Task 71). `extraction_status` is application-level
+    // enum: 'ok' | 'failed' | 'pending'.
+    extractedContent: text("extracted_content"),
+    extractedAt: timestamp("extracted_at", { withTimezone: true }),
+    extractionStatus: text("extraction_status"),
+    // Phase 15 — full-text search (GIN-indexed below). Generated from
+    // title + summary + extracted_content via to_tsvector('english'). We
+    // deliberately skip llm_summary because generated columns can't
+    // reference other tables — and the extracted_content already contains
+    // the source material that the LLM summary is derived from.
+    searchTsv: tsvector("search_tsv").generatedAlwaysAs(
+      sql`to_tsvector('english', coalesce(title, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(extracted_content, ''))`,
+    ),
+    // Phase 15 — semantic search vector. Written during the analyze phase
+    // over title + extracted_content (Task 89). HNSW-indexed below.
+    // Dimensions match the default embedding model (bge-m3 @ 1024).
+    embedding: vector("embedding", { dimensions: 1024 }),
+  },
+  (table) => [
+    index("articles_search_tsv_idx").using("gin", table.searchTsv),
+    index("articles_title_trgm_idx").using("gin", sql`title gin_trgm_ops`),
+    index("articles_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
+  ],
+);
 
 export const articleAnalysis = pgTable("article_analysis", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -157,11 +188,19 @@ export const articleHighlights = pgTable(
     charStart: integer("char_start"),
     charEnd: integer("char_end"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Phase 15 — semantic search vector for the highlight text. Written
+    // synchronously on POST /highlights (Task 90). Matches the articles
+    // dimension (bge-m3 @ 1024).
+    embedding: vector("embedding", { dimensions: 1024 }),
   },
   (table) => [
     index("article_highlights_article_idx").on(table.articleId),
     index("article_highlights_user_idx").on(table.userId),
     index("article_highlights_created_idx").on(table.createdAt.desc()),
+    index("article_highlights_embedding_idx").using(
+      "hnsw",
+      table.embedding.op("vector_cosine_ops"),
+    ),
   ],
 );
 

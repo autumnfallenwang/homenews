@@ -9,6 +9,9 @@ import type {
   PipelineRun,
   PipelineStatus,
   RankedResponse,
+  SearchMode,
+  SearchResponse,
+  SearchTarget,
   Setting,
   UpdateArticleInteraction,
   UpdateFeed,
@@ -177,6 +180,27 @@ export async function triggerFetchFeed(id: string): Promise<{ added: number }> {
 }
 
 // --- Settings ---
+
+// --- Search (Phase 15) ---
+
+export async function fetchSearch(params: {
+  q: string;
+  mode?: SearchMode;
+  target?: SearchTarget;
+  limit?: number;
+  offset?: number;
+}): Promise<SearchResponse> {
+  const url = new URL(`${API_URL}/search`);
+  url.searchParams.set("q", params.q);
+  if (params.mode) url.searchParams.set("mode", params.mode);
+  if (params.target) url.searchParams.set("target", params.target);
+  if (params.limit !== undefined) url.searchParams.set("limit", String(params.limit));
+  if (params.offset !== undefined) url.searchParams.set("offset", String(params.offset));
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to search: ${res.status}`);
+  return res.json();
+}
 
 export async function fetchSettings(): Promise<Setting[]> {
   const res = await fetch(`${API_URL}/settings`, { cache: "no-store" });

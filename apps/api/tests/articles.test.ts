@@ -52,6 +52,13 @@ vi.mock("../src/services/feed-fetcher.js", () => ({
   fetchAllFeeds: vi.fn(),
 }));
 
+// Phase 15 Task 90: embed the highlight text before insert. Mock to a
+// deterministic vector so tests don't hit the real gateway.
+vi.mock("../src/services/embed.js", () => ({
+  embed: vi.fn().mockResolvedValue(new Array(1024).fill(0.1)),
+  embedBatch: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("../src/services/settings.js", () => ({
   getSettingsBatch: vi.fn().mockResolvedValue({}),
   getSetting: vi.fn(),

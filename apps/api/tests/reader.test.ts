@@ -70,8 +70,11 @@ describe("extractArticle", () => {
   });
 
   beforeEach(() => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const noop = () => {
+      /* silence test console output */
+    };
+    vi.spyOn(console, "info").mockImplementation(noop);
+    vi.spyOn(console, "warn").mockImplementation(noop);
   });
 
   it("extracts a clean article from well-formed HTML", async () => {

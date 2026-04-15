@@ -15,6 +15,7 @@
     "db:seed": "tsx --env-file=.env src/db/seed.ts",
     "db:seed:settings": "tsx --env-file=.env src/db/seed-settings.ts",
     "db:backfill-extraction": "tsx --env-file=.env src/db/backfill-extraction.ts",
+    "db:backfill-embeddings": "tsx --env-file=.env src/db/backfill-embeddings.ts",
     "lint": "biome check src/ tests/",
     "lint:fix": "biome check --write src/ tests/"
   },
