@@ -1,4 +1,4 @@
-import { eq, getTableColumns } from "drizzle-orm";
+import { eq, getTableColumns, sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -40,6 +40,12 @@ export const articles = pgTable("articles", {
   publishedAt: timestamp("published_at", { withTimezone: true }),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   duplicateOfId: uuid("duplicate_of_id"),
+  // Phase 14 — reader mode cache. Populated during the analyze phase by
+  // services/reader.ts (Task 71). `extraction_status` is application-level
+  // enum: 'ok' | 'failed' | 'pending'.
+  extractedContent: text("extracted_content"),
+  extractedAt: timestamp("extracted_at", { withTimezone: true }),
+  extractionStatus: text("extraction_status"),
 });
 
 export const articleAnalysis = pgTable("article_analysis", {
@@ -98,6 +104,41 @@ export const pipelineRuns = pgTable(
   (table) => [index("pipeline_runs_started_at_idx").on(table.startedAt.desc())],
 );
 
+// Phase 14 — per-article user state. Nullable `user_id` for single-user
+// mode + forward-compat for multi-user auth. The unique constraint uses
+// NULLS NOT DISTINCT so single-user mode (user_id always NULL) still
+// enforces one interaction row per article.
+export const articleInteractions = pgTable(
+  "article_interactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => articles.id, { onDelete: "cascade" }),
+    userId: uuid("user_id"),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    starred: boolean("starred").notNull().default(false),
+    note: text("note"),
+    userTags: text("user_tags").array().notNull().default(sql`'{}'::text[]`),
+    followUp: boolean("follow_up").notNull().default(false),
+    readingSeconds: integer("reading_seconds"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("article_interactions_article_user_unique")
+      .on(table.articleId, table.userId)
+      .nullsNotDistinct(),
+    index("article_interactions_article_idx").on(table.articleId),
+    index("article_interactions_user_idx").on(table.userId),
+    // Partial indexes — only the "true" rows are ever queried, keeping the
+    // indexes tiny regardless of total interaction count.
+    index("article_interactions_starred_idx").on(table.articleId).where(sql`starred = true`),
+    index("article_interactions_follow_up_idx").on(table.articleId).where(sql`follow_up = true`),
+  ],
+);
+
 // View: joins for ranked API queries. No math here — composite score is computed
 // in the query layer using settings-driven weights (see Task 22).
 export const articleAnalysisWithFeed = pgView("article_analysis_with_feed").as((qb) =>
@@ -110,6 +151,9 @@ export const articleAnalysisWithFeed = pgView("article_analysis_with_feed").as((
       articleAuthor: articles.author,
       articlePublishedAt: articles.publishedAt,
       articleFetchedAt: articles.fetchedAt,
+      articleExtractedContent: articles.extractedContent,
+      articleExtractedAt: articles.extractedAt,
+      articleExtractionStatus: articles.extractionStatus,
       feedName: feeds.name,
       feedCategory: feeds.category,
       feedAuthorityScore: feeds.authorityScore,

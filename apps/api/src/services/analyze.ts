@@ -3,6 +3,7 @@ import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { articleAnalysis, articles, feeds } from "../db/schema.js";
 import { llmExecute } from "./llm-executor.js";
+import { extractArticle } from "./reader.js";
 import { getSetting } from "./settings.js";
 
 interface AnalyzeOptions {
@@ -110,12 +111,44 @@ export interface AnalyzeResult {
   tags: string[];
 }
 
-export function buildAnalyzePrompt(title: string, summary: string | null): string {
+export function buildAnalyzePrompt(
+  title: string,
+  summary: string | null,
+  content: string | null = null,
+): string {
   let prompt = `Title: ${title}`;
   if (summary) {
     prompt += `\nSummary: ${summary}`;
   }
+  if (content) {
+    // Cap at 2000 chars — same budget as summarize. Full text rarely
+    // improves tag classification beyond the first few paragraphs.
+    prompt += `\nContent: ${content.slice(0, 2000)}`;
+  }
   return prompt;
+}
+
+/**
+ * Regex-based HTML → plain text conversion for LLM prompt input. Not
+ * suitable for user-visible rendering — edge cases around nested tags,
+ * CDATA, and comments are ignored. Good enough for feeding extracted
+ * article content to analyze/summarize prompts where robustness to
+ * whitespace noise is high.
+ */
+export function htmlToPlainText(html: string, maxChars: number): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxChars);
 }
 
 function validateScore(value: unknown, field: string): number {
@@ -154,11 +187,79 @@ export function parseAnalyzeResult(
 export async function analyzeArticle(
   title: string,
   summary: string | null,
+  content: string | null = null,
 ): Promise<AnalyzeResult> {
-  const prompt = buildAnalyzePrompt(title, summary);
+  const prompt = buildAnalyzePrompt(title, summary, content);
   const result = await llmExecute("analyze", prompt);
   const allowedTags = await getSetting<string[]>("allowed_tags");
   return parseAnalyzeResult(result.parsed, allowedTags, title);
+}
+
+// ============================================================
+// Extraction cascade (Phase 14 Task 71)
+// ============================================================
+
+/**
+ * Ensure the article has extracted content stored in the DB and return a
+ * plain-text preview for use in LLM prompts. Three-step cascade:
+ *   1. Skip — if `extracted_content` is already populated, strip + return
+ *   2. Copy — if RSS `content` has substantial text (≥500 chars), persist
+ *      it verbatim with status='ok' and return stripped preview
+ *   3. Fetch — call Readability via services/reader.ts; persist result or
+ *      failure status, return plain text preview or null on failure
+ *
+ * Extraction failures are non-fatal: analyze continues with just
+ * title + RSS summary. See phase14-capture-memo.md.
+ */
+const RSS_FULLTEXT_MIN = 500;
+const PROMPT_PREVIEW_CHARS = 4000;
+
+async function ensureExtracted(article: {
+  id: string;
+  link: string;
+  content: string | null;
+  extractedContent: string | null;
+}): Promise<string | null> {
+  // 1. Skip
+  if (article.extractedContent) {
+    return htmlToPlainText(article.extractedContent, PROMPT_PREVIEW_CHARS);
+  }
+
+  // 2. Copy from RSS when full-text ships in the feed (arXiv, most Substacks)
+  if (article.content && article.content.length >= RSS_FULLTEXT_MIN) {
+    await db
+      .update(articles)
+      .set({
+        extractedContent: article.content,
+        extractedAt: new Date(),
+        extractionStatus: "ok",
+      })
+      .where(eq(articles.id, article.id));
+    return htmlToPlainText(article.content, PROMPT_PREVIEW_CHARS);
+  }
+
+  // 3. Fetch via Readability
+  const result = await extractArticle(article.link);
+  if (result.ok) {
+    await db
+      .update(articles)
+      .set({
+        extractedContent: result.content,
+        extractedAt: result.extractedAt,
+        extractionStatus: "ok",
+      })
+      .where(eq(articles.id, article.id));
+    return result.textContent.slice(0, PROMPT_PREVIEW_CHARS);
+  }
+
+  await db
+    .update(articles)
+    .set({
+      extractedAt: result.extractedAt,
+      extractionStatus: "failed",
+    })
+    .where(eq(articles.id, article.id));
+  return null;
 }
 
 export async function analyzeUnanalyzed(
@@ -229,6 +330,9 @@ export async function analyzeUnanalyzed(
     id: string;
     title: string;
     summary: string | null;
+    link: string;
+    content: string | null;
+    extractedContent: string | null;
     feedName: string;
   };
   const effectiveDate = sql<Date>`COALESCE(${articles.publishedAt}, ${articles.fetchedAt})`;
@@ -251,6 +355,9 @@ export async function analyzeUnanalyzed(
         id: articles.id,
         title: articles.title,
         summary: articles.summary,
+        link: articles.link,
+        content: articles.content,
+        extractedContent: articles.extractedContent,
         feedName: feeds.name,
       })
       .from(articles)
@@ -309,7 +416,8 @@ export async function analyzeUnanalyzed(
       feedName: article.feedName,
     });
     try {
-      const result = await analyzeArticle(article.title, article.summary);
+      const contentPreview = await ensureExtracted(article);
+      const result = await analyzeArticle(article.title, article.summary, contentPreview);
       await db.insert(articleAnalysis).values({
         articleId: article.id,
         relevance: result.relevance,

@@ -2,6 +2,7 @@ import type { PipelineProgressEvent } from "@homenews/shared";
 import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { articleAnalysis, articles, feeds } from "../db/schema.js";
+import { htmlToPlainText } from "./analyze.js";
 import { llmExecute } from "./llm-executor.js";
 
 /** Same window as analyze (Phase 10): articles older than this are skipped
@@ -77,6 +78,7 @@ export async function summarizeUnsummarized(
       title: articles.title,
       summary: articles.summary,
       content: articles.content,
+      extractedContent: articles.extractedContent,
       feedName: feeds.name,
     })
     .from(articleAnalysis)
@@ -104,7 +106,13 @@ export async function summarizeUnsummarized(
       feedName: row.feedName,
     });
     try {
-      const llmSummary = await summarizeArticle(row.title, row.summary, row.content);
+      // Prefer Phase 14 extracted content when available (populated during
+      // analyze). Falls back to raw RSS content when analyze hasn't run
+      // extraction yet (old rows pre-backfill).
+      const content = row.extractedContent
+        ? htmlToPlainText(row.extractedContent, 4000)
+        : row.content;
+      const llmSummary = await summarizeArticle(row.title, row.summary, content);
       await db
         .update(articleAnalysis)
         .set({ llmSummary })

@@ -1,6 +1,13 @@
 import { getTableColumns, getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { articleAnalysis, articles, feeds, pipelineRuns, settings } from "../src/db/schema.js";
+import {
+  articleAnalysis,
+  articleInteractions,
+  articles,
+  feeds,
+  pipelineRuns,
+  settings,
+} from "../src/db/schema.js";
 
 describe("feeds table", () => {
   it("has correct table name", () => {
@@ -61,6 +68,9 @@ describe("articles table", () => {
         "publishedAt",
         "fetchedAt",
         "duplicateOfId",
+        "extractedContent",
+        "extractedAt",
+        "extractionStatus",
       ].sort(),
     );
   });
@@ -81,6 +91,9 @@ describe("articles table", () => {
     expect(cols.author.notNull).toBe(false);
     expect(cols.publishedAt.notNull).toBe(false);
     expect(cols.duplicateOfId.notNull).toBe(false);
+    expect(cols.extractedContent.notNull).toBe(false);
+    expect(cols.extractedAt.notNull).toBe(false);
+    expect(cols.extractionStatus.notNull).toBe(false);
   });
 });
 
@@ -109,6 +122,52 @@ describe("article_analysis table", () => {
     const cols = getTableColumns(articleAnalysis);
     expect(cols.tags.notNull).toBe(false);
     expect(cols.llmSummary.notNull).toBe(false);
+  });
+});
+
+describe("article_interactions table", () => {
+  it("has correct table name", () => {
+    expect(getTableName(articleInteractions)).toBe("article_interactions");
+  });
+
+  it("has all expected columns", () => {
+    const cols = getTableColumns(articleInteractions);
+    expect(Object.keys(cols).sort()).toEqual(
+      [
+        "id",
+        "articleId",
+        "userId",
+        "viewedAt",
+        "readAt",
+        "starred",
+        "note",
+        "userTags",
+        "followUp",
+        "readingSeconds",
+        "createdAt",
+        "updatedAt",
+      ].sort(),
+    );
+  });
+
+  it("has notNull on required columns", () => {
+    const cols = getTableColumns(articleInteractions);
+    expect(cols.id.notNull).toBe(true);
+    expect(cols.articleId.notNull).toBe(true);
+    expect(cols.starred.notNull).toBe(true);
+    expect(cols.userTags.notNull).toBe(true);
+    expect(cols.followUp.notNull).toBe(true);
+    expect(cols.createdAt.notNull).toBe(true);
+    expect(cols.updatedAt.notNull).toBe(true);
+  });
+
+  it("allows null on optional columns", () => {
+    const cols = getTableColumns(articleInteractions);
+    expect(cols.userId.notNull).toBe(false);
+    expect(cols.viewedAt.notNull).toBe(false);
+    expect(cols.readAt.notNull).toBe(false);
+    expect(cols.note.notNull).toBe(false);
+    expect(cols.readingSeconds.notNull).toBe(false);
   });
 });
 

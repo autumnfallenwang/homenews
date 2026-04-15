@@ -14,6 +14,9 @@ const mockAnalysisRow = {
   articleAuthor: "Jane Doe",
   articlePublishedAt: new Date("2026-01-01"),
   articleFetchedAt: new Date("2026-01-01"),
+  articleExtractedContent: null,
+  articleExtractedAt: null,
+  articleExtractionStatus: null,
   feedName: "TechCrunch",
   feedAuthorityScore: 0.7,
   freshness: 0.9,
@@ -278,6 +281,37 @@ describe("GET /ranked", () => {
     expect(data.facets.sources).toEqual([]);
     expect(data.facets.tags).toEqual([]);
     expect(data.facets.categories).toEqual([]);
+  });
+
+  // ─── Task 75: tags filter matches LLM tags OR user tags ───
+
+  it("accepts tags filter that matches user_tags (via EXISTS subquery)", async () => {
+    // The raw sql EXISTS subquery on article_interactions should compile and
+    // run through the route without throwing. The mock doesn't exercise the
+    // actual SQL — this is a smoke test that the new query builds cleanly.
+    selectResults = [[mockAnalysisRow], [{ count: 1 }]];
+    const res = await app.request("/ranked?tags=ai-safety");
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.rows).toHaveLength(1);
+  });
+
+  it("tags facet query builds with the union-arrays subquery", async () => {
+    selectResults = [
+      [mockAnalysisRow],
+      [{ count: 1 }],
+      [{ name: "Anthropic", count: 5 }],
+      [
+        { name: "ai-safety", count: 14 },
+        { name: "roadmap", count: 3 },
+      ],
+      [{ name: "lab", count: 5 }],
+    ];
+    const res = await app.request("/ranked?include_facets=1");
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.facets.tags).toHaveLength(2);
+    expect(data.facets.tags[0].name).toBe("ai-safety");
   });
 });
 

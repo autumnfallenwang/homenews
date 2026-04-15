@@ -309,3 +309,110 @@
   animation: filterbar-edge-pulse 1.6s ease-in-out infinite;
   pointer-events: none;
 }
+
+/* Phase 14 — reader mode article body. Targets HTML produced by
+   @mozilla/readability and rendered via dangerouslySetInnerHTML. Mirrors
+   the POC article CSS validated in poc/reader-extract/. */
+.reader-content {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 17px;
+  line-height: 1.65;
+  color: oklch(0.88 0.008 80);
+  max-width: 680px;
+}
+.reader-content p {
+  margin: 0 0 1.2em;
+}
+.reader-content h1,
+.reader-content h2,
+.reader-content h3,
+.reader-content h4 {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+  color: oklch(0.92 0.008 80);
+}
+.reader-content h2 {
+  font-size: 26px;
+}
+.reader-content h3 {
+  font-size: 20px;
+}
+.reader-content h4 {
+  font-size: 17px;
+}
+.reader-content a {
+  color: oklch(0.76 0.15 65);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.reader-content a:hover {
+  text-decoration-thickness: 2px;
+}
+.reader-content img,
+.reader-content figure img,
+.reader-content picture img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid oklch(0.31 0.008 60);
+  margin: 1.5em 0;
+}
+.reader-content figure {
+  margin: 1.5em 0;
+}
+.reader-content figcaption {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: oklch(0.66 0.015 70);
+  margin-top: 8px;
+}
+.reader-content pre,
+.reader-content code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 13px;
+}
+.reader-content :not(pre) > code {
+  background: oklch(0.225 0.007 60 / 0.6);
+  border: 1px solid oklch(0.31 0.008 60);
+  border-radius: 2px;
+  padding: 2px 5px;
+}
+.reader-content pre {
+  background: oklch(0.225 0.007 60 / 0.5);
+  border: 1px solid oklch(0.31 0.008 60);
+  border-radius: 2px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  line-height: 1.5;
+  margin: 1.5em 0;
+}
+.reader-content pre code {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.reader-content blockquote {
+  border-left: 2px solid oklch(0.31 0.008 60);
+  padding-left: 18px;
+  color: oklch(0.66 0.015 70);
+  font-style: italic;
+  margin: 1.5em 0;
+}
+.reader-content ul,
+.reader-content ol {
+  padding-left: 24px;
+  margin: 0 0 1.2em;
+}
+.reader-content li {
+  margin-bottom: 0.3em;
+}
+.reader-content hr {
+  border: none;
+  border-top: 1px solid oklch(0.31 0.008 60);
+  margin: 2em 0;
+}

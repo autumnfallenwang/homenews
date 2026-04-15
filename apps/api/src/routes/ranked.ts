@@ -16,7 +16,7 @@ import {
 } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/index.js";
-import { articleAnalysisWithFeed } from "../db/schema.js";
+import { articleAnalysisWithFeed, articleInteractions } from "../db/schema.js";
 import { getSettingsBatch } from "../services/settings.js";
 
 const app = new Hono();
@@ -97,6 +97,9 @@ type RankedRow = {
   articleSummary: string | null;
   articleAuthor: string | null;
   articlePublishedAt: Date | string | null;
+  articleExtractedContent: string | null;
+  articleExtractedAt: Date | string | null;
+  articleExtractionStatus: string | null;
   feedName: string;
   feedAuthorityScore: number;
   freshness: number;
@@ -104,6 +107,10 @@ type RankedRow = {
 };
 
 function toResponse(r: RankedRow) {
+  const extractedAt =
+    r.articleExtractedAt instanceof Date
+      ? r.articleExtractedAt.toISOString()
+      : (r.articleExtractedAt ?? null);
   return {
     id: r.id,
     articleId: r.articleId,
@@ -122,6 +129,9 @@ function toResponse(r: RankedRow) {
       publishedAt: r.articlePublishedAt,
       feedName: r.feedName,
       feedAuthorityScore: Number(r.feedAuthorityScore),
+      extractedContent: r.articleExtractedContent,
+      extractedAt,
+      extractionStatus: r.articleExtractionStatus,
     },
   };
 }
@@ -158,7 +168,22 @@ function buildWhereClause(
     conds.push(inArray(articleAnalysisWithFeed.feedCategory, q.categories));
   }
   if (q.tags && q.tags.length > 0 && exclude !== "tags") {
-    conds.push(arrayOverlaps(articleAnalysisWithFeed.tags, q.tags));
+    // Phase 14 Task 75: tags filter matches EITHER LLM-generated tags OR
+    // user-added tags. Uses a correlated EXISTS subquery on
+    // article_interactions so there's no row duplication from a LEFT JOIN
+    // (which would break the GROUP BY in the facets path). Single-user mode:
+    // user_id IS NULL. When multi-user auth lands, add auth user scoping.
+    conds.push(
+      or(
+        arrayOverlaps(articleAnalysisWithFeed.tags, q.tags),
+        sql`EXISTS (
+          SELECT 1 FROM ${articleInteractions}
+          WHERE ${articleInteractions.articleId} = ${articleAnalysisWithFeed.articleId}
+            AND ${articleInteractions.userId} IS NULL
+            AND ${articleInteractions.userTags} && ${q.tags}::text[]
+        )`,
+      ),
+    );
   }
   if (q.composite_gte !== undefined) {
     // composite expression is 0..1 internally; filter input is 0..100 per
@@ -252,7 +277,22 @@ function fetchTagsFacet(
   compositeExpr: SQL<number>,
 ): Promise<FacetBucket[]> {
   const where = buildWhereClause(q, compositeExpr, "tags");
-  const tagExpr = sql<string>`unnest(${articleAnalysisWithFeed.tags})`;
+  // Union LLM-generated tags with user-added tags per article, then unnest.
+  // Articles tagged in both places contribute twice — acceptable at this
+  // scale since the facet is a UX hint, not precise analytics. COALESCE
+  // handles articles with no interaction row.
+  const tagExpr = sql<string>`unnest(
+    ${articleAnalysisWithFeed.tags}
+    || COALESCE(
+      (
+        SELECT ${articleInteractions.userTags}
+        FROM ${articleInteractions}
+        WHERE ${articleInteractions.articleId} = ${articleAnalysisWithFeed.articleId}
+          AND ${articleInteractions.userId} IS NULL
+      ),
+      '{}'::text[]
+    )
+  )`;
   return db
     .select({
       name: tagExpr,
@@ -294,6 +334,9 @@ app.get("/", async (c) => {
       articleSummary: articleAnalysisWithFeed.articleSummary,
       articleAuthor: articleAnalysisWithFeed.articleAuthor,
       articlePublishedAt: articleAnalysisWithFeed.articlePublishedAt,
+      articleExtractedContent: articleAnalysisWithFeed.articleExtractedContent,
+      articleExtractedAt: articleAnalysisWithFeed.articleExtractedAt,
+      articleExtractionStatus: articleAnalysisWithFeed.articleExtractionStatus,
       feedName: articleAnalysisWithFeed.feedName,
       feedAuthorityScore: articleAnalysisWithFeed.feedAuthorityScore,
       freshness: freshnessExpr,
@@ -358,6 +401,9 @@ app.get("/:id", async (c) => {
       articleSummary: articleAnalysisWithFeed.articleSummary,
       articleAuthor: articleAnalysisWithFeed.articleAuthor,
       articlePublishedAt: articleAnalysisWithFeed.articlePublishedAt,
+      articleExtractedContent: articleAnalysisWithFeed.articleExtractedContent,
+      articleExtractedAt: articleAnalysisWithFeed.articleExtractedAt,
+      articleExtractionStatus: articleAnalysisWithFeed.articleExtractionStatus,
       feedName: articleAnalysisWithFeed.feedName,
       feedAuthorityScore: articleAnalysisWithFeed.feedAuthorityScore,
       freshness: freshnessExpr,

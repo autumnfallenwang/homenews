@@ -1,11 +1,13 @@
 import type {
   AnalyzedArticle,
+  ArticleInteraction,
   CreateFeed,
   Feed,
   PipelineRun,
   PipelineStatus,
   RankedResponse,
   Setting,
+  UpdateArticleInteraction,
   UpdateFeed,
 } from "@homenews/shared";
 
@@ -55,6 +57,36 @@ export async function fetchRanked(filters?: RankedFilters): Promise<RankedRespon
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch ranked articles: ${res.status}`);
   return res.json();
+}
+
+// --- Article interactions (Phase 14) ---
+
+export async function fetchArticleInteraction(articleId: string): Promise<ArticleInteraction> {
+  const res = await fetch(`${API_URL}/articles/${articleId}/interaction`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch article interaction: ${res.status}`);
+  return res.json();
+}
+
+export async function updateArticleInteraction(
+  articleId: string,
+  body: UpdateArticleInteraction,
+): Promise<ArticleInteraction> {
+  const res = await fetch(`${API_URL}/articles/${articleId}/interaction`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Failed to update article interaction: ${res.status}`);
+  return res.json();
+}
+
+export async function trackArticleView(articleId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/articles/${articleId}/interaction/view`, {
+    method: "POST",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Failed to track article view: ${res.status}`);
 }
 
 export async function fetchRankedArticle(id: string): Promise<AnalyzedArticle | null> {

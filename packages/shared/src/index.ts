@@ -89,6 +89,11 @@ export const analyzedArticleSchema = z.object({
     publishedAt: z.string().nullable(),
     feedName: z.string(),
     feedAuthorityScore: z.number().min(0).max(1),
+    // Phase 14: reader mode fields populated by the analyze-phase extraction
+    // cascade. `extractionStatus` is 'ok' | 'failed' | 'pending' | null.
+    extractedContent: z.string().nullable(),
+    extractedAt: z.string().nullable(),
+    extractionStatus: z.string().nullable(),
   }),
 });
 
@@ -178,6 +183,42 @@ export type PipelineProgressEvent =
       durationMs: number;
       errorMessage?: string;
     };
+
+// --- Article interactions (Phase 14) ---
+// Per-article user state: viewed, read, starred, notes, user tags, follow-up,
+// reading time. `id` + timestamps are nullable so the API can return a
+// synthetic default for articles the user has never touched (no row exists),
+// without the client having to branch on presence.
+
+export const articleInteractionSchema = z.object({
+  id: z.string().uuid().nullable(),
+  articleId: z.string().uuid(),
+  userId: z.string().uuid().nullable(),
+  viewedAt: z.string().nullable(),
+  readAt: z.string().nullable(),
+  starred: z.boolean(),
+  note: z.string().nullable(),
+  userTags: z.array(z.string()),
+  followUp: z.boolean(),
+  readingSeconds: z.number().int().nullable(),
+  createdAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+});
+export type ArticleInteraction = z.infer<typeof articleInteractionSchema>;
+
+// PATCH body. Every field optional — only provided fields are updated.
+// `read: true` → server sets `readAt = now()`; `read: false` → clears it.
+// `viewedAt` is NOT in this schema — it's server-set via a separate
+// lightweight `POST /articles/:id/interaction/view` endpoint (Task 74).
+export const updateArticleInteractionSchema = z.object({
+  read: z.boolean().optional(),
+  starred: z.boolean().optional(),
+  note: z.string().nullable().optional(),
+  userTags: z.array(z.string()).optional(),
+  followUp: z.boolean().optional(),
+  readingSeconds: z.number().int().min(0).optional(),
+});
+export type UpdateArticleInteraction = z.infer<typeof updateArticleInteractionSchema>;
 
 // --- Ranked query + response (Phase 13) ---
 // Server-side filtering for GET /ranked. See phase13-server-filtering-memo.md

@@ -12,6 +12,7 @@ import {
   allocateSlots,
   buildAnalyzePrompt,
   type FeedAllocation,
+  htmlToPlainText,
   parseAnalyzeResult,
 } from "../src/services/analyze.js";
 
@@ -26,6 +27,59 @@ describe("buildAnalyzePrompt", () => {
     const prompt = buildAnalyzePrompt("AI Breakthrough", "New model achieves SOTA");
     expect(prompt).toContain("Title: AI Breakthrough");
     expect(prompt).toContain("Summary: New model achieves SOTA");
+  });
+
+  it("includes content when provided", () => {
+    const prompt = buildAnalyzePrompt(
+      "AI Breakthrough",
+      "Summary text",
+      "Full article body with multiple paragraphs of context.",
+    );
+    expect(prompt).toContain("Title: AI Breakthrough");
+    expect(prompt).toContain("Summary: Summary text");
+    expect(prompt).toContain("Content: Full article body");
+  });
+
+  it("truncates content to 2000 chars in the prompt", () => {
+    const longContent = "x".repeat(5000);
+    const prompt = buildAnalyzePrompt("T", null, longContent);
+    const contentSection = prompt.split("Content: ")[1] ?? "";
+    expect(contentSection.length).toBe(2000);
+  });
+});
+
+// biome-ignore lint/security/noSecrets: test HTML fixtures, not secrets
+describe("htmlToPlainText", () => {
+  it("strips HTML tags", () => {
+    // biome-ignore lint/security/noSecrets: HTML fixture
+    const out = htmlToPlainText("<p>Hello <b>world</b></p>", 100);
+    expect(out).toBe("Hello world");
+  });
+
+  it("removes script and style blocks entirely", () => {
+    // biome-ignore lint/security/noSecrets: HTML fixture
+    const html = "<p>before</p><script>alert('x')</script><style>.a{color:red}</style><p>after</p>";
+    const out = htmlToPlainText(html, 100);
+    expect(out).not.toContain("alert");
+    expect(out).not.toContain("color:red");
+    expect(out).toContain("before");
+    expect(out).toContain("after");
+  });
+
+  it("decodes common HTML entities", () => {
+    const out = htmlToPlainText("Tom &amp; Jerry said &quot;hi&quot; &lt;br&gt;", 100);
+    expect(out).toBe(`Tom & Jerry said "hi" <br>`);
+  });
+
+  it("collapses whitespace", () => {
+    const out = htmlToPlainText("<p>Hello\n\n\n   world</p>", 100);
+    expect(out).toBe("Hello world");
+  });
+
+  it("truncates to maxChars", () => {
+    // biome-ignore lint/security/noSecrets: HTML fixture
+    const out = htmlToPlainText("<p>abcdefghij</p>", 5);
+    expect(out).toBe("abcde");
   });
 });
 
