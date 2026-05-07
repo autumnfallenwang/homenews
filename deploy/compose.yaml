@@ -1,0 +1,81 @@
+services:
+  homenews-db-prod:
+    # pgvector/pgvector:pg17 — Phase 15 needs pg_trgm + pgvector extensions,
+    # which the official postgres:17-alpine base doesn't ship.
+    image: pgvector/pgvector:pg17
+    container_name: homenews-db-prod
+    restart: unless-stopped
+    ports:
+      - "52432:5432"
+    environment:
+      - POSTGRES_DB=homenews_prod
+      - POSTGRES_USER=homenews
+      - POSTGRES_PASSWORD=homenews_prod
+    volumes:
+      - homenews-db-prod-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homenews -d homenews_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Bounded stdout buffer so an idle stack with debug logs can't fill
+    # /var/lib/docker over months. Promtail tails all rotation files.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  homenews-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    container_name: homenews-api
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      homenews-db-prod:
+        condition: service_healthy
+    environment:
+      - API_PORT=52001
+      - DATABASE_URL=postgresql://homenews:homenews_prod@localhost:52432/homenews_prod
+      # LLM gateway runs on the same host. host network makes localhost =
+      # the host loopback, so this resolves to llm-gateway:51277.
+      - LLM_GATEWAY_URL=http://localhost:51277
+      # Pino reads this; bumped to debug at runtime without rebuild via
+      #   docker exec homenews-api sh -c 'export LOG_LEVEL=debug; ...'
+      # or by editing this line and `homenews restart`.
+      - LOG_LEVEL=info
+    volumes:
+      - /etc/resolv.conf:/etc/resolv.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  homenews-web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:52001
+    container_name: homenews-web
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - homenews-api
+    environment:
+      - PORT=52000
+      - HOSTNAME=0.0.0.0
+      - LOG_LEVEL=info
+    volumes:
+      - /etc/resolv.conf:/etc/resolv.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  homenews-db-prod-data:

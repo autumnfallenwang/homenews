@@ -7,6 +7,16 @@ Phase 16 (proposed). Two tightly-coupled tracks:
 
 Both are designed so the same shape ports back to homecal afterward — same logger module, same field conventions, same CLI grammar, same compose layout.
 
+## App-side responsibility (locked)
+
+The app has **three obligations** for logs and zero others:
+
+1. **Collect every event from every subsystem** through one logger import. No rogue `console.*`, no per-component log files, no separate streams.
+2. **Label with a standard shape** — required `time`/`level`/`msg`/`service`/`version` plus a locked vocabulary of optional fields (`event`, `req_id`, `run_id`, `err`, `*_ms`, `*_count`). The shape is identical across gateway / homenews / homecal / future apps. **The shape IS the contract** — it's what makes Loki able to treat every app the same way.
+3. **Emit through one portal** — JSON to stdout, one object per line. No file output, no syslog, no HTTP/Slack/email transports, no log shipping libraries. stdout is the boundary; everything past it is the platform's job.
+
+Anything beyond these three — query languages, retention, dashboards, alerting, log search UIs, "show me errors in the last hour" features — belongs to Loki / Grafana / Promtail. The app does not own a query engine, an index, a search verb, or a retention policy. **Replace any layer below stdout without touching the apps.**
+
 ---
 
 ## Track 1 — Production deploy
@@ -73,12 +83,13 @@ homenews version                  print package.json version
   # HomeNews-specific
 homenews backfill <kind>          run db:backfill-embeddings / db:backfill-extraction inside the api container
 homenews seed feeds               run seed-feeds.ts (first-time only — additive, idempotent)
-homenews logs query <LogQL>       (Phase 2, after Loki is up) wrap logcli; opt-in, never the default
 ```
+
+**No `logs query` verb.** The app does not own a Loki access path. Operators query Loki directly via `logcli` or Grafana — one access path that works for every app, not three different per-app shells. `homenews logs` stays as the local Docker tail (an *operator* command for the *app*, not a Loki feature) and that's the only `logs` HomeNews owns. This is a deliberate scope cut from the original draft to keep the app-side surface to "collect, label, emit" — nothing more.
 
 Notes on CLI design:
 
-- **Default `logs` stays local** (`docker compose logs -f`) — works even when Loki is down, no learning curve, day-zero usable. The `logs query` subcommand is opt-in and lives only after Loki is wired.
+- **`logs` is the local Docker tail** (`docker compose logs -f`) — works whether Loki is up or down, day-zero usable, never goes away.
 - **`update` is non-destructive** by default — it pulls main, rebuilds, runs `drizzle-kit push`. It does **not** re-seed feeds or run backfills (those are explicit subcommands).
 - **`backfill` runs inside the api container** so the LLM gateway URL + DB URL are exactly what the running app uses; no env drift between operator shell and container.
 
@@ -279,6 +290,34 @@ By subsystem (rough estimate from the earlier audit):
 | Server startup | `index.ts` | ~3 |
 | **Total** | | **~80** |
 
+### Label architecture (how Loki separates streams)
+
+Three label sources, each set by a different actor. They stack — Loki queries pivot on whichever combination you want.
+
+| Label | Set by | Example |
+|---|---|---|
+| `container` | Promtail (Docker SD) | `homenews-api`, `homenews-web`, `homenews-db-prod` |
+| `image` | Promtail (Docker SD) | `pgvector/pgvector:pg17` |
+| `host` | Promtail config | `arch-home` |
+| `service` | App's pino base config | `homenews-api`, `homenews-web` |
+| `version` | App's pino base config | `0.1.0` |
+| `event` | Each call site | `pipeline.run.start`, `http.request`, `embed.fail` |
+| `level` | pino | `info` / `warn` / `error` |
+| `req_id` / `run_id` | middleware / child logger | UUIDs |
+
+The first three are attached automatically by Promtail at scrape time — the app does nothing. The next two come from the app's pino instance. The rest come from the call site that emits the event.
+
+Each container is a **separate stream** in Loki by default; you join across them with queries when you want.
+
+### Mixed-source acceptance (PG, Next.js own logs)
+
+Loki ingests anything — JSON, plain text, multi-line stack traces. Parsing is a query-time choice (`| json` filter), not an ingest requirement.
+
+- **Postgres** emits its native log format on stdout; container labeled `homenews-db-prod`. Querying is line-grep (`|~ "ERROR"`), not field-query. Acceptable — PG logs are mostly noise unless something's broken; line-grep is enough when it does.
+- **Next.js's own access lines** (`[next] GET / 200 in 320ms` and friends) come through unstructured too. Same treatment. We do **not** try to wrap them; structured fields go where we control the call (route handlers, server actions, middleware), not where we don't.
+
+The investment in structured fields pays off where we control the code (api + web pino call sites). For PG and Next-internal lines, the container label + line-grep covers the realistic operator workflow.
+
 ### What we don't implement
 
 - **No file output from the app.** Docker writes the json-file capture; we don't.
@@ -341,5 +380,5 @@ Order matters because the deploy gives the logger somewhere to run.
 1. **Deploy track first** — Dockerfile.api, Dockerfile.web, compose.yaml, `homenews` CLI. Stack boots with current `console.*` logging unchanged. Verifies the production shape works end-to-end.
 2. **Logger module + middleware** — `apps/api/src/lib/logger.ts`, `apps/web/src/lib/logger.ts`, request middleware. No call-site migration yet. Both modules ship; tests assert shape.
 3. **Migration in subsystem-sized chunks** — pipeline first (highest-value events), then analyze + summarize, then reader + embed + llm, then routes + scheduler + settings, then backfills + seeds + index.ts. Each chunk is one PR with its own diff so the change is reviewable.
-4. **Loki + Promtail standup** — separate compose stack, separate CLI (`logs query`). HomeNews is a logs *producer*; Loki is the *consumer*. They land independently.
-5. **Port to homecal** — same Dockerfiles already exist; the new pieces are the logger module + middleware + (eventual) `homecal logs query`. Mostly copy/paste from this work.
+4. **Loki + Promtail standup** — separate shared observability compose, owned outside this repo. HomeNews is a logs *producer*; Loki is the *consumer*. They land independently and the app never knows about Loki's existence.
+5. **Port to homecal** — same Dockerfiles already exist; the new pieces are the logger module + middleware + the same locked event taxonomy. Mostly copy/paste from this work.

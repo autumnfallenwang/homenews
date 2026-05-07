@@ -235,7 +235,7 @@ Triggered by the realization that HomeNews's ~80 `console.*` call sites are unst
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 97 | `deploy/{compose.yaml, Dockerfile.api, Dockerfile.web, homenews}` | Planned | Mirror homecal verbatim. HomeNews-specific: `pgvector/pgvector:pg17` DB image, prod ports 52000/52001/52432, CLI gains `backfill`/`seed`/(later)`logs query` subcommands |
+| 97 | `deploy/{compose.yaml, Dockerfile.api, Dockerfile.web, homenews}` | Planned | Mirror homecal verbatim. HomeNews-specific: `pgvector/pgvector:pg17` DB image, prod ports 52000/52001/52432, CLI gains `backfill`/`seed` subcommands. **No `logs query` verb** — app does not own Loki access; operators use `logcli`/Grafana directly. `homenews logs` stays as the local Docker tail. |
 | 98 | `apps/api/src/lib/logger.ts` + `apps/web/src/lib/logger.ts` | Planned | pino instance with `base: { service, version }` from package.json, `LOG_LEVEL` env var, `pino-pretty` for dev. Mirror the gateway's module shape exactly so the same shape ports back to homecal |
 | 99 | Hono request-log middleware | Planned | Per-request `event: "http.request"` line with `req_id` UUID, `method`, `path`, `status`, `latency_ms`. Mounted at the top of `apps/api/src/index.ts` before any routes |
 | 100 | Pipeline-run correlation via pino child loggers | Planned | `runLog = log.child({ run_id, trigger })` threaded through analyze.ts/summarize.ts via the existing options bag so every event for one orchestrator run filters together in Loki |
