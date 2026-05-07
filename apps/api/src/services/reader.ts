@@ -48,9 +48,26 @@ function stripScripts(html: string): string {
   return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
 }
 
+// Hosts whose URLs are known-unextractable — fail fast instead of paying the
+// 10s fetch timeout. Google News RSS returns encrypted redirect pages whose
+// landing HTML is a JS-shell that Readability cannot parse; the lab-proxy
+// feeds (Anthropic / Meta AI / Mistral / Google AI) all route through it.
+const UNEXTRACTABLE_HOSTS = new Set(["news.google.com"]);
+
 export async function extractArticle(url: string): Promise<ExtractionResult> {
   const extractedAt = new Date();
   const startedAt = Date.now();
+
+  try {
+    const host = new URL(url).hostname;
+    if (UNEXTRACTABLE_HOSTS.has(host)) {
+      const error = `host ${host} is unextractable (redirect gate)`;
+      console.warn(`[reader] skip url=${url} error=${error}`);
+      return { ok: false, error, extractedAt };
+    }
+  } catch {
+    // Malformed URL — let fetch handle it below for a unified error path.
+  }
 
   let res: Response;
   try {

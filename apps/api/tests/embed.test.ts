@@ -19,7 +19,7 @@ import { embed, embedBatch } from "../src/services/embed.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetSetting.mockResolvedValue("bge-m3");
+  mockGetSetting.mockResolvedValue("bge-m3:latest");
   vi.spyOn(console, "info").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -58,7 +58,7 @@ describe("embed", () => {
     });
 
     await embed("hello");
-    expect(mockCreate).toHaveBeenCalledWith({ model: "bge-m3", input: "hello" });
+    expect(mockCreate).toHaveBeenCalledWith({ model: "bge-m3:latest", input: "hello" });
   });
 
   it("throws when the gateway returns an error", async () => {
@@ -101,7 +101,7 @@ describe("embedBatch", () => {
     await embedBatch(["a", "b", "c"]);
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(mockCreate).toHaveBeenCalledWith({
-      model: "bge-m3",
+      model: "bge-m3:latest",
       input: ["a", "b", "c"],
     });
   });

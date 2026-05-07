@@ -88,16 +88,16 @@ describe("getSystemPrompt", () => {
 // biome-ignore lint/security/noSecrets: false positive on function name
 describe("getModelForTask", () => {
   it("reads llm_model_analyze setting for analyze task", async () => {
-    getSettingMock.mockResolvedValueOnce("gpt-5.1-codex-mini");
+    getSettingMock.mockResolvedValueOnce("claude-haiku-4-5");
     const model = await getModelForTask("analyze");
-    expect(model).toBe("gpt-5.1-codex-mini");
+    expect(model).toBe("claude-haiku-4-5");
     expect(getSettingMock).toHaveBeenCalledWith("llm_model_analyze");
   });
 
   it("reads llm_model_summarize setting for summarize task", async () => {
-    getSettingMock.mockResolvedValueOnce("gpt-5.3-codex");
+    getSettingMock.mockResolvedValueOnce("claude-sonnet-4-5");
     const model = await getModelForTask("summarize");
-    expect(model).toBe("gpt-5.3-codex");
+    expect(model).toBe("claude-sonnet-4-5");
     expect(getSettingMock).toHaveBeenCalledWith("llm_model_summarize");
   });
 });

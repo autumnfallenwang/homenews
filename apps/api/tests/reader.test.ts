@@ -163,6 +163,20 @@ describe("extractArticle", () => {
     expect(result.error).toContain("timed out");
   });
 
+  it("fast-fails on news.google.com without hitting the network", async () => {
+    const spy = vi.fn();
+    globalThis.fetch = spy;
+
+    const result = await extractArticle(
+      "https://news.google.com/rss/articles/CBMiAA?oc=5",
+    );
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain("news.google.com");
+  });
+
   it("returns failure when Readability returns null", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(mockResponse(NOT_ARTICLE_HTML));
 

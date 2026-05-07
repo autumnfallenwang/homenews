@@ -13,7 +13,7 @@ import { llm } from "./llm-client.js";
 import { getSetting } from "./settings.js";
 
 const EMBEDDING_MODEL_SETTING = "embedding_model_name";
-const DEFAULT_MODEL = "bge-m3";
+const DEFAULT_MODEL = "bge-m3:latest";
 
 async function getModel(): Promise<string> {
   try {

@@ -586,9 +586,12 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
     description: "Max articles to summarize per scheduler tick",
   },
 
-  // LLM model selection (per-task primary + fallback)
+  // LLM model selection (per-task primary + fallback).
+  // Anthropic + Ollama only — other gateway model families (gpt-5.x codex,
+  // etc.) have been unreliable in practice; defaults are restricted to those
+  // two families so a fresh install gets a working baseline.
   llm_model_analyze: {
-    value: "gpt-5.1-codex-mini",
+    value: "claude-haiku-4-5",
     type: "string",
     description: "Primary LLM model for analyze task (classification: relevance, importance, tags)",
   },
@@ -598,7 +601,7 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
     description: "Fallback LLM model for analyze task if primary fails",
   },
   llm_model_summarize: {
-    value: "gpt-5.3-codex",
+    value: "claude-sonnet-4-5",
     type: "string",
     description: "Primary LLM model for summarize task (text generation)",
   },
@@ -610,7 +613,7 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
 
   // Embeddings (Phase 15)
   embedding_model_name: {
-    value: "bge-m3",
+    value: "bge-m3:latest",
     type: "string",
     description:
       "Embedding model for semantic search. Changing this requires re-embedding existing content via the backfill job — dimensions must match the vector(1024) column.",
