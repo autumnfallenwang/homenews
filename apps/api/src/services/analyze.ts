@@ -1,7 +1,9 @@
 import type { PipelineProgressEvent } from "@homenews/shared";
 import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
+import type { Logger } from "pino";
 import { db } from "../db/index.js";
 import { articleAnalysis, articles, feeds } from "../db/schema.js";
+import { log as defaultLog } from "../lib/logger.js";
 import { embed } from "./embed.js";
 import { llmExecute } from "./llm-executor.js";
 import { extractArticle } from "./reader.js";
@@ -12,6 +14,9 @@ interface AnalyzeOptions {
   /** Mutable cancel flag shared with the pipeline orchestrator. Checked
    *  before each LLM call; in-flight work always completes. */
   signal?: { cancelRequested: boolean };
+  /** Optional logger to scope events under (e.g. a child carrying run_id).
+   *  Falls back to the module singleton if omitted. */
+  log?: Logger;
 }
 
 /** Cutoff for which unanalyzed articles the pipeline will even look at.
@@ -176,8 +181,12 @@ export function parseAnalyzeResult(
     if (allowedSet.has(tag)) {
       tags.push(tag);
     } else {
-      console.warn(
-        `[analyze] Dropped unknown tag "${tag}"${articleTitle ? ` for article "${articleTitle}"` : ""}`,
+      // Singleton logger here — parseAnalyzeResult is exported and called
+      // from tests with explicit args; keeping its signature unchanged. The
+      // article_title field carries enough context without run_id.
+      defaultLog.warn(
+        { event: "analyze.tag.dropped", tag, article_title: articleTitle },
+        "dropped unknown tag from LLM output",
       );
     }
   }
@@ -285,6 +294,7 @@ async function ensureEmbedding(
   articleId: string,
   title: string,
   contentPreview: string | null,
+  log: Logger,
 ): Promise<void> {
   const snippet = contentPreview ? contentPreview.slice(0, EMBEDDING_INPUT_CHARS) : "";
   const input = snippet ? `${title}\n${snippet}` : title;
@@ -293,8 +303,10 @@ async function ensureEmbedding(
     const vector = await embed(input);
     await db.update(articles).set({ embedding: vector }).where(eq(articles.id, articleId));
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[analyze] embedding failed for "${title}": ${msg}`);
+    log.warn(
+      { event: "analyze.embedding.failed", article_id: articleId, article_title: title, err },
+      "embedding failed during analyze",
+    );
     // Swallow — the analysis row is already written; Task 91 backfill
     // will pick up this article on the next reconciliation run.
   }
@@ -304,7 +316,7 @@ export async function analyzeUnanalyzed(
   limit?: number,
   options: AnalyzeOptions = {},
 ): Promise<{ analyzed: number; errors: number }> {
-  const { onProgress, signal } = options;
+  const { onProgress, signal, log = defaultLog } = options;
   const effectiveLimit = limit && limit > 0 ? limit : 100;
 
   const cutoff = sql<Date>`NOW() - (${ANALYZE_MAX_AGE_DAYS} || ' days')::interval`;
@@ -353,11 +365,17 @@ export async function analyzeUnanalyzed(
 
   // Log allocation summary so we can see fairness at a glance per run.
   if (slots.size > 0) {
-    const summary = counts
+    const allocations = counts
       .filter((c) => slots.has(c.feedId))
-      .map((c) => `${c.feedName}=${slots.get(c.feedId)}/${Number(c.pending)}`)
-      .join(" · ");
-    console.info(`[analyze] allocation: ${summary}`);
+      .map((c) => ({
+        feed_name: c.feedName,
+        slots: slots.get(c.feedId) ?? 0,
+        pending: Number(c.pending),
+      }));
+    log.info(
+      { event: "analyze.allocation", batch_size: effectiveLimit, allocations },
+      "analyze slot allocation",
+    );
   }
 
   // ── Phase 3: fetch articles per feed (per-feed buckets) ──────────
@@ -466,10 +484,17 @@ export async function analyzeUnanalyzed(
       // Embedding is best-effort — runs AFTER the analysis insert so a
       // gateway hiccup never blocks the analyze row from being committed.
       // Internal try/catch swallows errors (Task 89).
-      await ensureEmbedding(article.id, article.title, contentPreview);
+      await ensureEmbedding(article.id, article.title, contentPreview, log);
     } catch (err) {
-      console.warn(
-        `[analyze] Failed for "${article.title}": ${err instanceof Error ? err.message : String(err)}`,
+      log.warn(
+        {
+          event: "analyze.item.failed",
+          article_id: article.id,
+          article_title: article.title,
+          feed_name: article.feedName,
+          err,
+        },
+        "analyze item failed",
       );
       errors++;
     }

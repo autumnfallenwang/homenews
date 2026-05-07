@@ -217,7 +217,7 @@ export async function runPipelineWithProgress(
         const phaseStart = performance.now();
         const limit = await getSetting<number>("analyze_batch_size");
         const signal = activeRuns.get(runId);
-        const result = await analyzeUnanalyzed(limit, { onProgress, signal });
+        const result = await analyzeUnanalyzed(limit, { onProgress, signal, log: runLog });
         analyzeAnalyzed = result.analyzed;
         analyzeErrors = result.errors;
         runLog.info(
@@ -245,7 +245,7 @@ export async function runPipelineWithProgress(
         const phaseStart = performance.now();
         const limit = await getSetting<number>("summarize_batch_size");
         const signal = activeRuns.get(runId);
-        const result = await summarizeUnsummarized(limit, { onProgress, signal });
+        const result = await summarizeUnsummarized(limit, { onProgress, signal, log: runLog });
         summarizeSummarized = result.summarized;
         summarizeErrors = result.errors;
         runLog.info(

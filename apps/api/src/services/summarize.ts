@@ -1,7 +1,9 @@
 import type { PipelineProgressEvent } from "@homenews/shared";
 import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
+import type { Logger } from "pino";
 import { db } from "../db/index.js";
 import { articleAnalysis, articles, feeds } from "../db/schema.js";
+import { log as defaultLog } from "../lib/logger.js";
 import { htmlToPlainText } from "./analyze.js";
 import { llmExecute } from "./llm-executor.js";
 
@@ -16,6 +18,9 @@ interface SummarizeOptions {
   /** Mutable cancel flag shared with the pipeline orchestrator. Checked
    *  before each LLM call; in-flight work always completes. */
   signal?: { cancelRequested: boolean };
+  /** Optional logger to scope events under (e.g. a child carrying run_id).
+   *  Falls back to the module singleton if omitted. */
+  log?: Logger;
 }
 
 export function buildSummaryPrompt(
@@ -55,7 +60,7 @@ export async function summarizeUnsummarized(
   limit?: number,
   options: SummarizeOptions = {},
 ): Promise<{ summarized: number; errors: number }> {
-  const { onProgress, signal } = options;
+  const { onProgress, signal, log = defaultLog } = options;
 
   // Phase 11 pickup policy: value-first ordering + 14-day window + enabled
   // feed filter. The priority dimension is (relevance + importance) desc
@@ -119,8 +124,15 @@ export async function summarizeUnsummarized(
         .where(eq(articleAnalysis.id, row.analysisId));
       summarized++;
     } catch (err) {
-      console.warn(
-        `[summarize] Failed for "${row.title}": ${err instanceof Error ? err.message : String(err)}`,
+      log.warn(
+        {
+          event: "summarize.item.failed",
+          analysis_id: row.analysisId,
+          article_title: row.title,
+          feed_name: row.feedName,
+          err,
+        },
+        "summarize item failed",
       );
       errors++;
     }
