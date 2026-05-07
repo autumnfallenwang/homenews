@@ -1,3 +1,4 @@
+import { log } from "../lib/logger.js";
 import { chatCompletion } from "./llm-client.js";
 import {
   getFallbackModelForTask,
@@ -38,8 +39,15 @@ export async function llmExecute(task: LlmTaskName, prompt: string): Promise<Llm
   } catch (err) {
     if (!fallbackModel || fallbackModel === primaryModel) throw err;
 
-    console.warn(
-      `[llm:${task}] Primary model ${primaryModel} failed, trying fallback ${fallbackModel}: ${err instanceof Error ? err.message : String(err)}`,
+    log.warn(
+      {
+        event: "llm.fallback.used",
+        task,
+        primary_model: primaryModel,
+        fallback_model: fallbackModel,
+        err: err instanceof Error ? err : new Error(String(err)),
+      },
+      "primary LLM failed, retrying with fallback model",
     );
     model = fallbackModel;
     raw = await chatCompletion(prompt, { systemPrompt, model: fallbackModel });
@@ -52,7 +60,10 @@ export async function llmExecute(task: LlmTaskName, prompt: string): Promise<Llm
     parsed = extractJson(raw);
   }
 
-  console.info(`[llm:${task}] model=${model} duration=${durationMs}ms ok`);
+  log.info(
+    { event: "llm.ok", task, model, duration_ms: durationMs },
+    "LLM call succeeded",
+  );
 
   return { raw, parsed, task, model, durationMs };
 }

@@ -10,6 +10,7 @@
 
 import { Readability } from "@mozilla/readability";
 import { JSDOM, VirtualConsole } from "jsdom";
+import { log } from "../lib/logger.js";
 
 // Desktop Safari user agent. Several sources (MIT Tech Review, NVIDIA) return
 // SPA shells or 403s to unrecognized user agents; impersonating a real browser
@@ -62,7 +63,10 @@ export async function extractArticle(url: string): Promise<ExtractionResult> {
     const host = new URL(url).hostname;
     if (UNEXTRACTABLE_HOSTS.has(host)) {
       const error = `host ${host} is unextractable (redirect gate)`;
-      console.warn(`[reader] skip url=${url} error=${error}`);
+      log.warn(
+        { event: "reader.skip", url, host, reason: "unextractable_host" },
+        "reader skipped — known-unextractable host",
+      );
       return { ok: false, error, extractedAt };
     }
   } catch {
@@ -83,13 +87,19 @@ export async function extractArticle(url: string): Promise<ExtractionResult> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const error = `fetch failed: ${msg}`;
-    console.warn(`[reader] fail url=${url} error=${error}`);
+    log.warn(
+      { event: "reader.fail", url, stage: "fetch", err: e instanceof Error ? e : new Error(msg) },
+      "reader fetch failed",
+    );
     return { ok: false, error, extractedAt };
   }
 
   if (!res.ok) {
     const error = `HTTP ${res.status} ${res.statusText}`;
-    console.warn(`[reader] fail url=${url} error=${error}`);
+    log.warn(
+      { event: "reader.fail", url, stage: "http", http_status: res.status },
+      "reader fetch returned non-2xx",
+    );
     return { ok: false, error, httpStatus: res.status, extractedAt };
   }
 
@@ -99,7 +109,16 @@ export async function extractArticle(url: string): Promise<ExtractionResult> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const error = `body read failed: ${msg}`;
-    console.warn(`[reader] fail url=${url} error=${error}`);
+    log.warn(
+      {
+        event: "reader.fail",
+        url,
+        stage: "body_read",
+        http_status: res.status,
+        err: e instanceof Error ? e : new Error(msg),
+      },
+      "reader body read failed",
+    );
     return { ok: false, error, httpStatus: res.status, extractedAt };
   }
 
@@ -121,7 +140,16 @@ export async function extractArticle(url: string): Promise<ExtractionResult> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const error = `jsdom parse failed: ${msg}`;
-    console.warn(`[reader] fail url=${url} error=${error}`);
+    log.warn(
+      {
+        event: "reader.fail",
+        url,
+        stage: "jsdom",
+        http_status: res.status,
+        err: e instanceof Error ? e : new Error(msg),
+      },
+      "reader jsdom parse failed",
+    );
     return { ok: false, error, httpStatus: res.status, extractedAt };
   }
 
@@ -132,20 +160,35 @@ export async function extractArticle(url: string): Promise<ExtractionResult> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const error = `readability parse failed: ${msg}`;
-    console.warn(`[reader] fail url=${url} error=${error}`);
+    log.warn(
+      {
+        event: "reader.fail",
+        url,
+        stage: "readability",
+        http_status: res.status,
+        err: e instanceof Error ? e : new Error(msg),
+      },
+      "reader Readability.parse failed",
+    );
     return { ok: false, error, httpStatus: res.status, extractedAt };
   }
 
   if (!article?.content) {
     const error = "Readability returned null — no article-shaped content found";
-    console.warn(`[reader] fail url=${url} error=${error}`);
+    log.warn(
+      { event: "reader.fail", url, stage: "readability", http_status: res.status, reason: "null" },
+      "reader Readability returned null content",
+    );
     return { ok: false, error, httpStatus: res.status, extractedAt };
   }
 
   const textContent = article.textContent ?? "";
   const length = article.length ?? textContent.length;
   const durationMs = Date.now() - startedAt;
-  console.info(`[reader] ok url=${url} chars=${length} ms=${durationMs}`);
+  log.info(
+    { event: "reader.ok", url, chars: length, duration_ms: durationMs },
+    "reader extraction succeeded",
+  );
 
   return {
     ok: true,

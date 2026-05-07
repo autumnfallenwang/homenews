@@ -9,6 +9,7 @@
 // those call sites wrap in try/catch so a failed embedding doesn't kill
 // the whole batch.
 
+import { log } from "../lib/logger.js";
 import { llm } from "./llm-client.js";
 import { getSetting } from "./settings.js";
 
@@ -39,11 +40,27 @@ export async function embed(text: string): Promise<number[]> {
       throw new Error("embeddings.create returned no data");
     }
     const durationMs = Date.now() - startedAt;
-    console.info(`[embed] ok chars=${text.length} dims=${vector.length} ms=${durationMs}`);
+    log.info(
+      {
+        event: "embed.ok",
+        model,
+        chars: text.length,
+        dims: vector.length,
+        duration_ms: durationMs,
+      },
+      "embedding succeeded",
+    );
     return vector;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[embed] fail chars=${text.length} error=${msg}`);
+    log.warn(
+      {
+        event: "embed.fail",
+        model,
+        chars: text.length,
+        err: err instanceof Error ? err : new Error(String(err)),
+      },
+      "embedding failed",
+    );
     throw err;
   }
 }
@@ -67,13 +84,29 @@ export async function embedBatch(texts: string[]): Promise<number[][]> {
       throw new Error(`embedBatch: got ${vectors.length} vectors for ${texts.length} inputs`);
     }
     const durationMs = Date.now() - startedAt;
-    console.info(
-      `[embed] batch ok n=${texts.length} chars=${totalChars} dims=${vectors[0]?.length ?? 0} ms=${durationMs}`,
+    log.info(
+      {
+        event: "embed.batch.ok",
+        model,
+        batch_size: texts.length,
+        chars: totalChars,
+        dims: vectors[0]?.length ?? 0,
+        duration_ms: durationMs,
+      },
+      "embedding batch succeeded",
     );
     return vectors;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[embed] batch fail n=${texts.length} chars=${totalChars} error=${msg}`);
+    log.warn(
+      {
+        event: "embed.batch.fail",
+        model,
+        batch_size: texts.length,
+        chars: totalChars,
+        err: err instanceof Error ? err : new Error(String(err)),
+      },
+      "embedding batch failed",
+    );
     throw err;
   }
 }
