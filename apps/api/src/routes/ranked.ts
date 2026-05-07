@@ -272,7 +272,7 @@ function fetchCategoriesFacet(
     .orderBy(desc(sql`count(*)`)) as Promise<FacetBucket[]>;
 }
 
-function fetchTagsFacet(
+async function fetchTagsFacet(
   q: ReturnType<typeof rankedQuerySchema.parse>,
   compositeExpr: SQL<number>,
 ): Promise<FacetBucket[]> {
@@ -281,27 +281,36 @@ function fetchTagsFacet(
   // Articles tagged in both places contribute twice — acceptable at this
   // scale since the facet is a UX hint, not precise analytics. COALESCE
   // handles articles with no interaction row.
-  const tagExpr = sql<string>`unnest(
-    ${articleAnalysisWithFeed.tags}
-    || COALESCE(
-      (
-        SELECT ${articleInteractions.userTags}
-        FROM ${articleInteractions}
-        WHERE ${articleInteractions.articleId} = ${articleAnalysisWithFeed.articleId}
-          AND ${articleInteractions.userId} IS NULL
-      ),
-      '{}'::text[]
-    )
-  )`;
-  return db
-    .select({
-      name: tagExpr,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(articleAnalysisWithFeed)
-    .where(where)
-    .groupBy(tagExpr)
-    .orderBy(desc(sql`count(*)`)) as Promise<FacetBucket[]>;
+  //
+  // Raw SQL via db.execute() instead of the drizzle query builder because:
+  //  (a) drizzle renders the same `unnest(...)` fragment with slightly
+  //      different table qualification in SELECT vs GROUP BY and PG rejects
+  //      that as non-matching expressions — an inner subquery with .as()
+  //      works but breaks the existing ranked.test.ts mock chain;
+  //  (b) the raw-SQL pattern matches search.ts and sidesteps both issues.
+  const whereFragment = where ? sql` WHERE ${where}` : sql``;
+  const result = await db.execute(sql`
+    SELECT name, count(*)::int AS count
+    FROM (
+      SELECT unnest(
+        ${articleAnalysisWithFeed.tags}
+        || COALESCE(
+          (
+            SELECT ${articleInteractions.userTags}
+            FROM ${articleInteractions}
+            WHERE ${articleInteractions.articleId} = ${articleAnalysisWithFeed.articleId}
+              AND ${articleInteractions.userId} IS NULL
+          ),
+          '{}'::text[]
+        )
+      ) AS name
+      FROM ${articleAnalysisWithFeed}
+      ${whereFragment}
+    ) t
+    GROUP BY name
+    ORDER BY count(*) DESC
+  `);
+  return result as unknown as FacetBucket[];
 }
 
 // List ranked articles (main feed endpoint) — Phase 13 filter/sort/pagination.

@@ -26,6 +26,8 @@ const mockAnalysisRow = {
 // Each test can queue up a sequence of results — first db.select() returns
 // selectResults[0], second returns selectResults[1], etc. This matters for
 // the list endpoint which runs the row query + a count query in parallel.
+// `db.execute()` (used by fetchTagsFacet since the Phase 14 tags union
+// rewrite) dequeues from the same queue in call order.
 let selectResults: unknown[][] = [];
 let selectCallIndex = 0;
 
@@ -45,6 +47,10 @@ vi.mock("../src/db/index.js", () => ({
       const result = selectResults[selectCallIndex++] ?? [];
       return makeChain(result);
     },
+    execute: vi.fn(() => {
+      const result = selectResults[selectCallIndex++] ?? [];
+      return Promise.resolve(result);
+    }),
   },
 }));
 
