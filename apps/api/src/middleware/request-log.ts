@@ -11,13 +11,15 @@ import { log } from "../lib/logger.js";
 
 export const requestLog: MiddlewareHandler = async (c, next) => {
   const start = Date.now();
-  const req_id = crypto.randomUUID();
-  c.set("req_id", req_id);
+  // Local var is camelCase per project lint; the JSON field stays snake_case
+  // because that's the Loki/conventions standard the gateway also uses.
+  const reqId = crypto.randomUUID();
+  c.set("req_id", reqId);
   await next();
   log.info(
     {
       event: "http.request",
-      req_id,
+      req_id: reqId,
       method: c.req.method,
       path: c.req.path,
       status: c.res.status,

@@ -13,8 +13,11 @@
  * Idempotent: updates by feed name.
  */
 import { eq } from "drizzle-orm";
+import { log } from "../lib/logger.js";
 import { db } from "./index.js";
 import { feeds } from "./schema.js";
+
+const SCRIPT = "seed-upgrade-sites-2026-04-13";
 
 // biome-ignore-start lint/security/noSecrets: Google News RSS URLs are public search endpoints
 const upgrades: { name: string; newName: string; url: string }[] = [
@@ -37,7 +40,7 @@ const upgrades: { name: string; newName: string; url: string }[] = [
 // biome-ignore-end lint/security/noSecrets: Google News RSS URLs are public search endpoints
 
 async function run() {
-  console.info("[migration] upgrade-sites 2026-04-13 — starting");
+  log.info({ event: "migration.start", script: SCRIPT }, "migration starting");
   for (const u of upgrades) {
     const updated = await db
       .update(feeds)
@@ -51,16 +54,22 @@ async function run() {
       .where(eq(feeds.name, u.name))
       .returning({ id: feeds.id, name: feeds.name });
     if (updated.length > 0) {
-      console.info(`[migration]   ${u.name} → ${u.newName} (${u.url})`);
+      log.info(
+        { event: "migration.feed.updated", script: SCRIPT, from: u.name, to: u.newName, url: u.url },
+        "feed renamed + URL updated",
+      );
     } else {
-      console.info(`[migration]   ${u.name} not found, skipping`);
+      log.info(
+        { event: "migration.feed.skipped", script: SCRIPT, from: u.name, reason: "not_found" },
+        "feed row not found, skipping",
+      );
     }
   }
-  console.info("[migration] done");
+  log.info({ event: "migration.done", script: SCRIPT }, "migration complete");
   process.exit(0);
 }
 
 run().catch((err) => {
-  console.error("[migration] failed:", err);
+  log.error({ event: "migration.failed", script: SCRIPT, err }, "migration failed");
   process.exit(1);
 });

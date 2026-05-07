@@ -13,8 +13,11 @@
  * re-run.
  */
 import { eq } from "drizzle-orm";
+import { log } from "../lib/logger.js";
 import { db } from "./index.js";
 import { feeds } from "./schema.js";
+
+const SCRIPT = "seed-new-sources-2026-04-13";
 
 // biome-ignore-start lint/security/noSecrets: Google News RSS URLs are public search endpoints, not secrets
 const newFeeds = [
@@ -60,7 +63,7 @@ const newFeeds = [
 // biome-ignore-end lint/security/noSecrets: Google News RSS URLs are public search endpoints, not secrets
 
 async function run() {
-  console.info("[migration] 2026-04-13 new sources — starting");
+  log.info({ event: "migration.start", script: SCRIPT }, "migration starting");
 
   // 1. Fix Google AI Blog URL
   const googleFix = await db
@@ -72,9 +75,15 @@ async function run() {
     .where(eq(feeds.name, "Google AI Blog"))
     .returning({ id: feeds.id, url: feeds.url });
   if (googleFix.length > 0) {
-    console.info(`[migration] Google AI Blog URL patched → ${googleFix[0].url}`);
+    log.info(
+      { event: "migration.feed.url_patched", script: SCRIPT, name: "Google AI Blog", url: googleFix[0].url },
+      "Google AI Blog URL patched",
+    );
   } else {
-    console.info("[migration] Google AI Blog row not found, skipping URL patch");
+    log.info(
+      { event: "migration.feed.skipped", script: SCRIPT, name: "Google AI Blog", reason: "not_found" },
+      "Google AI Blog row not found, skipping URL patch",
+    );
   }
 
   // 2. Add new feeds (skip if URL already present)
@@ -83,10 +92,16 @@ async function run() {
     .values(newFeeds)
     .onConflictDoNothing({ target: feeds.url })
     .returning({ id: feeds.id, name: feeds.name });
-  console.info(`[migration] Inserted ${inserted.length}/${newFeeds.length} new feeds`);
-  for (const f of inserted) {
-    console.info(`[migration]   + ${f.name}`);
-  }
+  log.info(
+    {
+      event: "migration.feeds.inserted",
+      script: SCRIPT,
+      inserted: inserted.length,
+      total: newFeeds.length,
+      names: inserted.map((f) => f.name),
+    },
+    "new feeds inserted",
+  );
 
   // 3. Disable VentureBeat AI (dead feed)
   const ventureDisable = await db
@@ -95,16 +110,22 @@ async function run() {
     .where(eq(feeds.name, "VentureBeat AI"))
     .returning({ id: feeds.id, enabled: feeds.enabled });
   if (ventureDisable.length > 0) {
-    console.info("[migration] VentureBeat AI disabled");
+    log.info(
+      { event: "migration.feed.disabled", script: SCRIPT, name: "VentureBeat AI" },
+      "VentureBeat AI disabled (dead feed)",
+    );
   } else {
-    console.info("[migration] VentureBeat AI row not found, skipping disable");
+    log.info(
+      { event: "migration.feed.skipped", script: SCRIPT, name: "VentureBeat AI", reason: "not_found" },
+      "VentureBeat AI row not found, skipping disable",
+    );
   }
 
-  console.info("[migration] done");
+  log.info({ event: "migration.done", script: SCRIPT }, "migration complete");
   process.exit(0);
 }
 
 run().catch((err) => {
-  console.error("[migration] failed:", err);
+  log.error({ event: "migration.failed", script: SCRIPT, err }, "migration failed");
   process.exit(1);
 });

@@ -1,13 +1,17 @@
+import { log } from "../lib/logger.js";
 import { seedDefaults } from "../services/settings.js";
 
 async function main() {
-  console.info("Seeding default settings...");
+  log.info({ event: "seed.settings.start" }, "seeding default settings");
   const result = await seedDefaults();
-  console.info(`Seeded ${result.seeded} settings rows (existing rows untouched).`);
+  log.info(
+    { event: "seed.settings.done", seeded: result.seeded },
+    "settings seed complete (existing rows untouched)",
+  );
   process.exit(0);
 }
 
 main().catch((err) => {
-  console.error("Settings seed failed:", err);
+  log.error({ event: "seed.settings.failed", err }, "settings seed failed");
   process.exit(1);
 });

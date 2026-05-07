@@ -1,3 +1,4 @@
+import { log } from "../lib/logger.js";
 import { db } from "./index.js";
 import { feeds } from "./schema.js";
 
@@ -18,13 +19,13 @@ const starterFeeds = [
 ];
 
 async function seed() {
-  console.info("Seeding feeds...");
+  log.info({ event: "seed.feeds.start", count: starterFeeds.length }, "seeding starter feeds");
   await db.insert(feeds).values(starterFeeds).onConflictDoNothing({ target: feeds.url });
-  console.info(`Seeded ${starterFeeds.length} feeds.`);
+  log.info({ event: "seed.feeds.done", count: starterFeeds.length }, "starter feeds seeded");
   process.exit(0);
 }
 
 seed().catch((err) => {
-  console.error("Seed failed:", err);
+  log.error({ event: "seed.feeds.failed", err }, "starter-feeds seed failed");
   process.exit(1);
 });

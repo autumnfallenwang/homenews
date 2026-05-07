@@ -14,6 +14,7 @@
 // every run).
 
 import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { log } from "../lib/logger.js";
 import { extractArticle } from "../services/reader.js";
 import { db } from "./index.js";
 import { articleAnalysis, articles, feeds } from "./schema.js";
@@ -44,8 +45,9 @@ async function run() {
       ),
     );
 
-  console.info(
-    `[backfill-extraction] ${rows.length} rows to process${retryFailed ? " (including previously failed)" : ""}`,
+  log.info(
+    { event: "backfill.extraction.start", to_process: rows.length, retry_failed: retryFailed },
+    "backfill-extraction starting",
   );
 
   let copied = 0;
@@ -56,8 +58,15 @@ async function run() {
     const row = rows[i];
 
     if ((i + 1) % 10 === 0 || i === 0) {
-      console.info(
-        `[backfill-extraction] (${i + 1}/${rows.length}) ${row.feedName}: ${row.title.slice(0, 60)}`,
+      log.info(
+        {
+          event: "backfill.extraction.progress",
+          index: i + 1,
+          total: rows.length,
+          feed_name: row.feedName,
+          article_title: row.title,
+        },
+        "backfill-extraction progress",
       );
     }
 
@@ -100,13 +109,20 @@ async function run() {
   }
 
   const durationSec = Math.round((Date.now() - startedAt) / 1000);
-  console.info(
-    `[backfill-extraction] done: copied=${copied} fetched=${fetched} failed=${failed} duration=${durationSec}s`,
+  log.info(
+    {
+      event: "backfill.extraction.done",
+      copied,
+      fetched,
+      failed,
+      duration_seconds: durationSec,
+    },
+    "backfill-extraction complete",
   );
   process.exit(0);
 }
 
 run().catch((err) => {
-  console.error("[backfill-extraction] failed:", err);
+  log.error({ event: "backfill.extraction.failed", err }, "backfill-extraction failed");
   process.exit(1);
 });

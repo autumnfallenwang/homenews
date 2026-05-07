@@ -13,6 +13,7 @@
 // over title + extracted_content are much richer than title alone.
 
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { log } from "../lib/logger.js";
 import { htmlToPlainText } from "../services/analyze.js";
 import { embed } from "../services/embed.js";
 import { db } from "./index.js";
@@ -37,7 +38,10 @@ async function backfillArticles() {
     .where(and(isNull(articles.embedding)))
     .orderBy(desc(articleAnalysis.analyzedAt));
 
-  console.info(`[backfill-embeddings] articles: ${rows.length} rows to process`);
+  log.info(
+    { event: "backfill.embeddings.articles.start", to_process: rows.length },
+    "backfill-embeddings articles starting",
+  );
 
   let embedded = 0;
   let failed = 0;
@@ -46,8 +50,15 @@ async function backfillArticles() {
     const row = rows[i];
 
     if ((i + 1) % 10 === 0 || i === 0) {
-      console.info(
-        `[backfill-embeddings] (${i + 1}/${rows.length}) ${row.feedName}: ${row.title.slice(0, 60)}`,
+      log.info(
+        {
+          event: "backfill.embeddings.articles.progress",
+          index: i + 1,
+          total: rows.length,
+          feed_name: row.feedName,
+          article_title: row.title,
+        },
+        "backfill-embeddings progress",
       );
     }
 
@@ -64,15 +75,27 @@ async function backfillArticles() {
       await db.update(articles).set({ embedding: vector }).where(eq(articles.id, row.id));
       embedded++;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[backfill-embeddings] article ${row.id} failed: ${msg}`);
+      log.warn(
+        {
+          event: "backfill.embeddings.article.failed",
+          article_id: row.id,
+          err: err instanceof Error ? err : new Error(String(err)),
+        },
+        "article embed failed during backfill",
+      );
       failed++;
     }
   }
 
   const durationSec = Math.round((Date.now() - startedAt) / 1000);
-  console.info(
-    `[backfill-embeddings] articles done: embedded=${embedded} failed=${failed} duration=${durationSec}s`,
+  log.info(
+    {
+      event: "backfill.embeddings.articles.done",
+      embedded,
+      failed,
+      duration_seconds: durationSec,
+    },
+    "backfill-embeddings articles complete",
   );
 }
 
@@ -92,7 +115,10 @@ async function backfillHighlights() {
     .where(isNull(articleHighlights.embedding))
     .orderBy(desc(articleHighlights.createdAt));
 
-  console.info(`[backfill-embeddings] highlights: ${rows.length} rows to process`);
+  log.info(
+    { event: "backfill.embeddings.highlights.start", to_process: rows.length },
+    "backfill-embeddings highlights starting",
+  );
 
   let embedded = 0;
   let failed = 0;
@@ -101,8 +127,15 @@ async function backfillHighlights() {
     const row = rows[i];
 
     if ((i + 1) % 10 === 0 || i === 0) {
-      console.info(
-        `[backfill-embeddings] (${i + 1}/${rows.length}) ${row.feedName}: ${row.articleTitle.slice(0, 40)}`,
+      log.info(
+        {
+          event: "backfill.embeddings.highlights.progress",
+          index: i + 1,
+          total: rows.length,
+          feed_name: row.feedName,
+          article_title: row.articleTitle,
+        },
+        "backfill-embeddings highlights progress",
       );
     }
 
@@ -114,15 +147,27 @@ async function backfillHighlights() {
         .where(eq(articleHighlights.id, row.id));
       embedded++;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[backfill-embeddings] highlight ${row.id} failed: ${msg}`);
+      log.warn(
+        {
+          event: "backfill.embeddings.highlight.failed",
+          highlight_id: row.id,
+          err: err instanceof Error ? err : new Error(String(err)),
+        },
+        "highlight embed failed during backfill",
+      );
       failed++;
     }
   }
 
   const durationSec = Math.round((Date.now() - startedAt) / 1000);
-  console.info(
-    `[backfill-embeddings] highlights done: embedded=${embedded} failed=${failed} duration=${durationSec}s`,
+  log.info(
+    {
+      event: "backfill.embeddings.highlights.done",
+      embedded,
+      failed,
+      duration_seconds: durationSec,
+    },
+    "backfill-embeddings highlights complete",
   );
 }
 
@@ -133,6 +178,6 @@ async function run() {
 }
 
 run().catch((err) => {
-  console.error("[backfill-embeddings] fatal:", err);
+  log.error({ event: "backfill.embeddings.failed", err }, "backfill-embeddings fatal error");
   process.exit(1);
 });
