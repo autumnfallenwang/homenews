@@ -18,6 +18,7 @@ import {
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/index.js";
+import { log } from "../lib/logger.js";
 import { embed } from "../services/embed.js";
 
 const app = new Hono();
@@ -461,8 +462,15 @@ app.get("/", async (c) => {
     try {
       queryVec = await embed(q.q);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[search] query embedding failed: ${msg}`);
+      log.warn(
+        {
+          event: "search.query.embed.failed",
+          mode: q.mode,
+          req_id: c.get("req_id"),
+          err: err instanceof Error ? err : new Error(String(err)),
+        },
+        "search query embedding failed; degrading to non-semantic results",
+      );
       // Fall through — semantic/hybrid will degrade to empty or keyword.
     }
   }

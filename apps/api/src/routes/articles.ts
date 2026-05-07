@@ -9,6 +9,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/index.js";
 import { articleHighlights, articleInteractions, articles } from "../db/schema.js";
+import { log } from "../lib/logger.js";
 import { embed } from "../services/embed.js";
 
 const app = new Hono();
@@ -230,8 +231,15 @@ app.post("/:id/highlights", async (c) => {
   try {
     embedding = await embed(parsed.data.text);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[highlights] embedding failed for article ${id}: ${msg}`);
+    log.warn(
+      {
+        event: "highlights.embedding.failed",
+        article_id: id,
+        req_id: c.get("req_id"),
+        err: err instanceof Error ? err : new Error(String(err)),
+      },
+      "highlight embedding failed; persisting without vector",
+    );
   }
 
   const [inserted] = await db

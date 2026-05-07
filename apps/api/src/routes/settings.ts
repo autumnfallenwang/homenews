@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS, updateSettingSchema } from "@homenews/shared";
 import { Hono } from "hono";
+import { log } from "../lib/logger.js";
 import { applyScheduleFromSettings } from "../services/scheduler.js";
 import { getSetting, listSettings, resetSettings, setSetting } from "../services/settings.js";
 
@@ -65,8 +66,13 @@ app.patch("/:key", async (c) => {
       try {
         await applyScheduleFromSettings();
       } catch (err) {
-        console.warn(
-          `[settings] Failed to hot-reload scheduler: ${err instanceof Error ? err.message : String(err)}`,
+        log.warn(
+          {
+            event: "settings.scheduler_reload.failed",
+            req_id: c.get("req_id"),
+            err: err instanceof Error ? err : new Error(String(err)),
+          },
+          "failed to hot-reload scheduler after settings change",
         );
       }
     }

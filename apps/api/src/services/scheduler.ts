@@ -1,4 +1,5 @@
 import { type ScheduledTask, schedule } from "node-cron";
+import { log } from "../lib/logger.js";
 import { PipelineBusyError, runPipelineWithProgress } from "./pipeline.js";
 import { getSetting } from "./settings.js";
 
@@ -42,7 +43,10 @@ export async function applyScheduleFromSettings(): Promise<void> {
 export async function runSchedulerTick(): Promise<void> {
   const schedulerEnabled = await getSetting<boolean>("scheduler_enabled");
   if (!schedulerEnabled) {
-    console.info("[scheduler] scheduler_enabled=false, skipping tick");
+    log.info(
+      { event: "scheduler.tick.skipped", reason: "scheduler_disabled" },
+      "scheduler tick skipped (scheduler_enabled=false)",
+    );
     return;
   }
 
@@ -50,16 +54,25 @@ export async function runSchedulerTick(): Promise<void> {
     await runPipelineWithProgress("scheduler");
   } catch (err) {
     if (err instanceof PipelineBusyError) {
-      console.warn(
-        `[scheduler] skipping tick — pipeline already running (runId=${err.activeRunId})`,
+      log.warn(
+        {
+          event: "scheduler.tick.skipped",
+          reason: "pipeline_busy",
+          active_run_id: err.activeRunId,
+        },
+        "scheduler tick skipped — pipeline already running",
       );
       return;
     }
     // The orchestrator catches pipeline-internal errors and records them in
     // pipeline_runs (status='failed'), so this branch is only reached for
     // truly unexpected failures (DB connection drop, out-of-memory, etc.).
-    console.warn(
-      `[scheduler] tick failed unexpectedly: ${err instanceof Error ? err.message : String(err)}`,
+    log.warn(
+      {
+        event: "scheduler.tick.failed",
+        err: err instanceof Error ? err : new Error(String(err)),
+      },
+      "scheduler tick failed unexpectedly",
     );
   }
 }
@@ -75,7 +88,10 @@ export function startScheduler(cronExpression: string = DEFAULT_SCHEDULE): Sched
     name: "feed-fetcher",
   });
 
-  console.info(`[scheduler] Started with schedule: ${cronExpression}`);
+  log.info(
+    { event: "scheduler.started", cron: cronExpression },
+    "scheduler started",
+  );
   return task;
 }
 
@@ -84,6 +100,6 @@ export function stopScheduler(): void {
     void task.stop();
     task = null;
     currentSchedule = null;
-    console.info("[scheduler] Stopped");
+    log.info({ event: "scheduler.stopped" }, "scheduler stopped");
   }
 }
