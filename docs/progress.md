@@ -225,11 +225,23 @@ Three retrieval modes — keyword (`tsvector` + GIN), fuzzy (`pg_trgm`), semanti
 - **Web dashboard**: Next.js 15 App Router, Tailwind v4, shadcn primitives, warm-dark/amber "newsroom workstation" theme (Fraunces display + Geist Mono data + hairline borders + 0.25rem radius, no shadows/gradients, light/dark/system theme switcher). Pipeline control strip at top with idle / running / watching / history states, per-article progress ticker during runs, re-attach via `/status` polling when the user navigates back to the dashboard mid-run. Filter bar with 7 groups (search / sources / sort always open; categories / tags / thresholds / published behind a single "more filters" toggle), URL-as-source-of-truth via `useSearchParams` + `router.replace`, 300ms debounced search, facet counts inline on chips, in-page shimmer via `useTransition` + context during navigation, pagination footer
 - **Web settings**: tabbed settings page at `/settings` with 7 sections (Scoring / Freshness / Scheduler / LLM Models / Tag Vocabulary / Theme / Feeds), per-tab dirty tracking + SaveBar, unsaved-changes Dialog, URL deep-linking via `?tab=`. `/feeds` redirects to `/settings?tab=feeds`
 - **Shared**: Zod schemas for all DTOs — `Feed` (with `authorityScore` + `analyzeWeight`), `Article`, `ArticleAnalysis`, `AnalyzedArticle`, `CreateFeed` / `UpdateFeed`, `Setting` / `UpdateSetting`, `PipelineRun` + `PipelineStatus` + `PipelineProgressEvent` discriminated union, `rankedQuerySchema` + `rankedResponseSchema` + facet schemas, `parseRankedSort` helper, `DEFAULT_SETTINGS`, `ALLOWED_TAGS` (~39 entries)
-- **Tooling**: Biome lint + format, Vitest **208 tests passing**, TypeScript strict mode, SwiftLint (iOS deferred), Turborepo caching, Docker PostgreSQL start/stop/reset
+- **Tooling**: Biome lint + format, Vitest **289 tests passing**, TypeScript strict mode, SwiftLint (iOS deferred), Turborepo caching, Docker PostgreSQL start/stop/reset
 
-## What's Next
+## Phase 16: Production deploy + structured logging (PLANNED)
 
-**Phase 15 complete.** Both halves of the "Capture + Find" arc from the Phase 14 planning session are now shipped: Phase 14 (reader mode + interactions + highlights) turned articles into a durable knowledge surface, Phase 15 (keyword + fuzzy + semantic + hybrid search over articles and highlights, with hit-highlighting for keyword modes) made it queryable. The corpus can now answer questions at the passage level, semantic retrieval finds conceptually-related content even without keyword matches, and Claude (or any other tool) can consume `GET /search` as a knowledge-base API. Next direction TBD — the memo flagged synthesis / topic tracker / knowledge graph as explicitly deferred; future phases can pick up any of those or pivot.
+See [deploy-and-logging-plan.md](deploy-and-logging-plan.md) for the full design — the homecal-mirror prod deploy (Dockerfile.api / Dockerfile.web / compose.yaml / `homenews` CLI) plus a brand-new structured logging system (pino → JSON to stdout, no app-side files) ready for Promtail → Loki → Grafana ingestion. Mirrors the locked `llm-gateway/docs/structured-logging-spec.md` so a single Loki query spans gateway + homenews + future apps.
+
+Triggered by the realization that HomeNews's ~80 `console.*` call sites are unstructured strings on a single host with no aggregation, and that the project has reached the point where a real prod stack + observability is more valuable than another feature phase. Scope: containerize api + web + db, ship a `homenews` CLI mirroring `homecal`, add a pino logger with `service`/`version` base config, wire a Hono request-log middleware, and migrate the call sites by subsystem. Loki + Promtail + Grafana stand up in a separate shared observability compose (one Loki for all apps); HomeNews is a producer, not a consumer.
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 97 | `deploy/{compose.yaml, Dockerfile.api, Dockerfile.web, homenews}` | Planned | Mirror homecal verbatim. HomeNews-specific: `pgvector/pgvector:pg17` DB image, prod ports 52000/52001/52432, CLI gains `backfill`/`seed`/(later)`logs query` subcommands |
+| 98 | `apps/api/src/lib/logger.ts` + `apps/web/src/lib/logger.ts` | Planned | pino instance with `base: { service, version }` from package.json, `LOG_LEVEL` env var, `pino-pretty` for dev. Mirror the gateway's module shape exactly so the same shape ports back to homecal |
+| 99 | Hono request-log middleware | Planned | Per-request `event: "http.request"` line with `req_id` UUID, `method`, `path`, `status`, `latency_ms`. Mounted at the top of `apps/api/src/index.ts` before any routes |
+| 100 | Pipeline-run correlation via pino child loggers | Planned | `runLog = log.child({ run_id, trigger })` threaded through analyze.ts/summarize.ts via the existing options bag so every event for one orchestrator run filters together in Loki |
+| 101 | Migrate ~80 `console.*` sites to structured `log.*` | Planned | Subsystem-sized chunks: pipeline → analyze + summarize → reader + embed + llm → routes + scheduler + settings → backfills + seeds + index.ts. 13 locked event namespaces (pipeline.*, analyze.*, summarize.*, reader.*, embed.*, llm.*, search.*, scheduler.*, settings.*, migration.*, http.*, server.*, fetch.*) |
+| 102 | Tests | Planned | Logger-shape unit test, middleware test capturing pino destination to a buffer, no per-call-site testing (plumbing) |
+| 103 | Verification + changelog | Planned | `homenews logs` shows JSON, request middleware fires, run_id correlation works, Loki query proves end-to-end ingestion (after Promtail standup) |
 
 ## Reference Docs
 
@@ -244,5 +256,6 @@ Three retrieval modes — keyword (`tsvector` + GIN), fuzzy (`pg_trgm`), semanti
 - [phase13-filter-bar-mockup.html](phase13-filter-bar-mockup.html) — filter bar visual reference (empty / active / loading)
 - [phase14-capture-memo.md](phase14-capture-memo.md) — reader mode + interactions + highlights design (planned)
 - [phase15-find-memo.md](phase15-find-memo.md) — keyword + fuzzy + semantic search design (planned)
+- [deploy-and-logging-plan.md](deploy-and-logging-plan.md) — Phase 16 prod deploy + structured logging plan
 - [changelog.md](changelog.md) — append-only log of hotfixes and small changes
 - [lessons.md](lessons.md) — recurring-pattern corrections

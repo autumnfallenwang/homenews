@@ -123,6 +123,9 @@ See [phase10-analyze-allocation-memo.md](phase10-analyze-allocation-memo.md). Ta
 ### Phase 11 — Summarize policy (PROPOSED)
 Small follow-up adding value-first ordering + 14-day window + enabled filter to `summarizeUnsummarized()`. See [pipeline-flow.md](pipeline-flow.md) Layer 3 for rationale.
 
+### Phase 16 — Production deploy + structured logging (PLANNED)
+See [deploy-and-logging-plan.md](deploy-and-logging-plan.md). Two coupled tracks: containerize api + web + db with a `homenews` CLI wrapper mirroring the `homecal` pattern (HomeNews-specific: `pgvector/pgvector:pg17` DB image, prod ports 52000/52001/52432, CLI gains `backfill`/`seed`/(later)`logs query` subcommands), and replace ~80 ad-hoc `console.*` calls with a structured pino logger writing JSON to stdout for Promtail → Loki → Grafana ingestion. Mirrors `llm-gateway/docs/structured-logging-spec.md` so a single Loki query spans all apps.
+
 ### Phase 12+ — Future Enhancements (deferred)
 - Full article fetching for thin feeds
 - Custom topic profiles
