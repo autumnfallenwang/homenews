@@ -7,6 +7,7 @@ import type {
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { pipelineRuns } from "../db/schema.js";
+import { log } from "../lib/logger.js";
 import { analyzeUnanalyzed } from "./analyze.js";
 import { fetchAllFeeds } from "./feed-fetcher.js";
 import { getSetting } from "./settings.js";
@@ -142,7 +143,10 @@ export async function runPipelineWithProgress(
 
   const runId = startRow.id;
   const startedAt = startRow.startedAt;
-  const shortId = runId.slice(0, 8);
+  // Child logger carries run_id + trigger on every line, so a single Loki
+  // query like `{service="homenews-api"} | json | run_id="..."` returns the
+  // full audit trail across pipeline + analyze + summarize.
+  const runLog = log.child({ run_id: runId, trigger });
 
   activeRuns.set(runId, { cancelRequested: false });
 
@@ -164,7 +168,7 @@ export async function runPipelineWithProgress(
       trigger,
       startedAt: startedAt.toISOString(),
     });
-    console.info(`[pipeline] run ${shortId} start (trigger=${trigger})`);
+    runLog.info({ event: "pipeline.run.start" }, "pipeline run started");
 
     // Phase 1 — Fetch (always runs)
     if (wasCancelRequested()) {
@@ -173,20 +177,31 @@ export async function runPipelineWithProgress(
       await onProgress?.({ type: "fetch-start" });
       const phaseStart = performance.now();
       const results = await fetchAllFeeds();
-      // Per-feed log lines — restored after Task 44 dropped them. Cheap to
-      // emit and the only way to surface specific feed failures (e.g. the
-      // Google AI Blog rss-parser error). Aggregate counts follow.
+      // Per-feed log lines — the only way to surface specific feed failures
+      // (e.g. the Google AI Blog rss-parser error). Aggregate counts follow.
       for (const r of results) {
         if (r.error) {
-          console.warn(`[pipeline] run ${shortId} fetch:${r.feedName} ERROR — ${r.error}`);
+          runLog.warn(
+            { event: "fetch.feed.error", feed_name: r.feedName, error_message: r.error },
+            "feed fetch failed",
+          );
         } else {
-          console.info(`[pipeline] run ${shortId} fetch:${r.feedName} added=${r.added}`);
+          runLog.info(
+            { event: "fetch.feed.ok", feed_name: r.feedName, added: r.added },
+            "feed fetched",
+          );
         }
       }
       fetchAdded = results.reduce((sum, r) => sum + r.added, 0);
       fetchErrors = results.filter((r) => r.error).length;
-      console.info(
-        `[pipeline] run ${shortId} fetch done in ${ms(phaseStart)}ms — added=${fetchAdded} errors=${fetchErrors}`,
+      runLog.info(
+        {
+          event: "pipeline.fetch.done",
+          duration_ms: ms(phaseStart),
+          added: fetchAdded,
+          errors: fetchErrors,
+        },
+        "fetch phase complete",
       );
       await onProgress?.({ type: "fetch-done", added: fetchAdded, errors: fetchErrors });
     }
@@ -205,11 +220,20 @@ export async function runPipelineWithProgress(
         const result = await analyzeUnanalyzed(limit, { onProgress, signal });
         analyzeAnalyzed = result.analyzed;
         analyzeErrors = result.errors;
-        console.info(
-          `[pipeline] run ${shortId} analyze done in ${ms(phaseStart)}ms — analyzed=${result.analyzed} errors=${result.errors}`,
+        runLog.info(
+          {
+            event: "pipeline.analyze.done",
+            duration_ms: ms(phaseStart),
+            analyzed: result.analyzed,
+            errors: result.errors,
+          },
+          "analyze phase complete",
         );
       } else {
-        console.info(`[pipeline] run ${shortId} analyze skipped (analyze_enabled=false)`);
+        runLog.info(
+          { event: "pipeline.analyze.skipped" },
+          "analyze phase skipped (analyze_enabled=false)",
+        );
       }
     }
 
@@ -224,11 +248,20 @@ export async function runPipelineWithProgress(
         const result = await summarizeUnsummarized(limit, { onProgress, signal });
         summarizeSummarized = result.summarized;
         summarizeErrors = result.errors;
-        console.info(
-          `[pipeline] run ${shortId} summarize done in ${ms(phaseStart)}ms — summarized=${result.summarized} errors=${result.errors}`,
+        runLog.info(
+          {
+            event: "pipeline.summarize.done",
+            duration_ms: ms(phaseStart),
+            summarized: result.summarized,
+            errors: result.errors,
+          },
+          "summarize phase complete",
         );
       } else {
-        console.info(`[pipeline] run ${shortId} summarize skipped (summarize_enabled=false)`);
+        runLog.info(
+          { event: "pipeline.summarize.skipped" },
+          "summarize phase skipped (summarize_enabled=false)",
+        );
       }
     }
 
@@ -246,7 +279,10 @@ export async function runPipelineWithProgress(
   } catch (err) {
     finalStatus = "failed";
     errorMessage = err instanceof Error ? err.message : String(err);
-    console.warn(`[pipeline] run ${shortId} failed: ${errorMessage}`);
+    runLog.warn(
+      { event: "pipeline.run.failed", err: err instanceof Error ? err : new Error(errorMessage) },
+      "pipeline run failed",
+    );
   } finally {
     activeRuns.delete(runId);
   }
@@ -271,7 +307,10 @@ export async function runPipelineWithProgress(
     .where(eq(pipelineRuns.id, runId))
     .returning();
 
-  console.info(`[pipeline] run ${shortId} ${finalStatus} in ${durationMs}ms`);
+  runLog.info(
+    { event: "pipeline.run.done", final_status: finalStatus, duration_ms: durationMs },
+    "pipeline run finished",
+  );
   await onProgress?.({
     type: "run-done",
     status: finalStatus,
