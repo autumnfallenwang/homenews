@@ -126,6 +126,9 @@ Small follow-up adding value-first ordering + 14-day window + enabled filter to 
 ### Phase 16 — Production deploy + structured logging (PLANNED)
 See [deploy-and-logging-plan.md](deploy-and-logging-plan.md). Two coupled tracks: containerize api + web + db with a `homenews` CLI wrapper mirroring the `homecal` pattern (HomeNews-specific: `pgvector/pgvector:pg17` DB image, prod ports 52000/52001/52432, CLI gains `backfill`/`seed`/(later)`logs query` subcommands), and replace ~80 ad-hoc `console.*` calls with a structured pino logger writing JSON to stdout for Promtail → Loki → Grafana ingestion. Mirrors `llm-gateway/docs/structured-logging-spec.md` so a single Loki query spans all apps.
 
+### Phase 17 — k3s migration (PLANNED)
+See [phase17-k3s-migration-memo.md](phase17-k3s-migration-memo.md). Move HomeNews off the single-host docker-compose stack onto the home k3s cluster managed by `arch-infra` (Argo CD GitOps), the same path llmgw took on 2026-05-10. Tasks 104-118: Helm chart at `deploy/chart/` (StatefulSet db + Deployment api/web + two Ingresses), matrix GHA build to GHCR with `yq` bumping both image tags in arch-infra, `pg_dump | pg_restore` data migration of the prod database, cutover behind `homenews.arch.local` + `homenews-api.arch.local`, and Loki-based verification that closes Phase 16 Task 103. Cluster reference: [k3s-migration/02-K3S_REFERENCE.md](k3s-migration/02-K3S_REFERENCE.md).
+
 ### Phase 12+ — Future Enhancements (deferred)
 - Full article fetching for thin feeds
 - Custom topic profiles
