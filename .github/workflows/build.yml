@@ -1,0 +1,126 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Serialize back-to-back main pushes so an in-flight arch-infra bump
+# isn't cancelled mid-clone-push.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Lint is intentionally NOT a CI gate here. Pre-existing biome errors on
+      # main (search.ts noEvolvingTypes, analyze.ts noShadow, two pipeline
+      # cognitive-complexity, several formatter complaints) would fail every
+      # PR. Cleanup is a separate phase; keep lint as a local pre-merge gate.
+
+      - run: pnpm test:fast
+
+  build-and-deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        component: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.component }} image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deploy/Dockerfile.${{ matrix.component }}
+          push: true
+          tags: |
+            ghcr.io/autumnfallenwang/homenews-${{ matrix.component }}:latest
+            ghcr.io/autumnfallenwang/homenews-${{ matrix.component }}:${{ github.sha }}
+          # Only the web image bakes the API URL into the client bundle
+          # (Next.js inlines NEXT_PUBLIC_* values at build time). API needs no build args.
+          build-args: |
+            ${{ matrix.component == 'web' && 'NEXT_PUBLIC_API_URL=http://homenews-api.arch.local' || '' }}
+          # Separate cache scopes — api and web have unrelated dep trees,
+          # sharing one cache would thrash constantly.
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+
+  bump-arch-infra:
+    needs: build-and-deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bump api+web image tags in arch-infra
+        env:
+          GH_TOKEN: ${{ secrets.ARCH_INFRA_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::ARCH_INFRA_TOKEN not set — see docs/phase17-k3s-migration-memo.md Phase C. Skipping arch-infra bump."
+            exit 0
+          fi
+
+          # Use x-access-token URL so `git push` carries the PAT — `gh repo clone`
+          # would not bake the token into the push URL (ref doc gotcha #2).
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/autumnfallenwang/arch-infra.git" /tmp/arch-infra
+          cd /tmp/arch-infra
+
+          if [ ! -f apps/homenews.yaml ]; then
+            echo "::warning::apps/homenews.yaml not present in arch-infra (Phase 17 Task 113 pending). Skipping bump."
+            exit 0
+          fi
+
+          # Single yq write rewrites both api.image.tag and web.image.tag —
+          # ArgoCD rolls api + web together (they're built from the same SHA;
+          # the contract evolves in lockstep, especially NEXT_PUBLIC_API_URL).
+          # Per ref doc gotcha #3: yq, not sed — sed is too greedy on `tag:`.
+          # yq (mike farah v4) is preinstalled on ubuntu-latest.
+          yq -i '
+            (.spec.source.helm.parameters[] | select(.name == "api.image.tag") | .value) = strenv(SHA) |
+            (.spec.source.helm.parameters[] | select(.name == "web.image.tag") | .value) = strenv(SHA)
+          ' apps/homenews.yaml
+
+          git config user.email "actions@github.com"
+          git config user.name  "GitHub Actions"
+
+          if git diff --quiet apps/homenews.yaml; then
+            echo "No change — arch-infra apps/homenews.yaml already at $SHA."
+            exit 0
+          fi
+
+          git add apps/homenews.yaml
+          git commit -m "homenews: bump api+web images to $SHA"
+          git push
