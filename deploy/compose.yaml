@@ -8,13 +8,13 @@ services:
     ports:
       - "52432:5432"
     environment:
-      - POSTGRES_DB=homenews_prod
+      - POSTGRES_DB=homenews
       - POSTGRES_USER=homenews
-      - POSTGRES_PASSWORD=homenews_prod
+      - POSTGRES_PASSWORD=homenews
     volumes:
       - homenews-db-prod-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U homenews -d homenews_prod"]
+      test: ["CMD-SHELL", "pg_isready -U homenews -d homenews"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -38,7 +38,7 @@ services:
         condition: service_healthy
     environment:
       - API_PORT=52001
-      - DATABASE_URL=postgresql://homenews:homenews_prod@localhost:52432/homenews_prod
+      - DATABASE_URL=postgresql://homenews:homenews@localhost:52432/homenews
       # LLM gateway runs on the same host. host network makes localhost =
       # the host loopback, so this resolves to llm-gateway:51277.
       - LLM_GATEWAY_URL=http://localhost:51277

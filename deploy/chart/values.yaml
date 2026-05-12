@@ -26,7 +26,7 @@ api:
   env:
     API_PORT: "52001"
     # In-cluster Service DNS for DB + LLM gateway (llmgw migrated to k3s).
-    DATABASE_URL: postgres://homenews:homenews_prod@homenews-db:5432/homenews_prod
+    DATABASE_URL: postgres://homenews:homenews@homenews-db:5432/homenews
     LLM_GATEWAY_URL: http://llmgw.llmgw
     LOG_LEVEL: info
   resources:
@@ -103,11 +103,11 @@ db:
     storageClass: local-path
     mountPath: /var/lib/postgresql/data
   env:
-    POSTGRES_DB: homenews_prod
+    POSTGRES_DB: homenews
     POSTGRES_USER: homenews
     # Plaintext per Phase 17 memo decision (LAN-only). Move to Sealed Secrets
     # later as a no-downtime swap.
-    POSTGRES_PASSWORD: homenews_prod
+    POSTGRES_PASSWORD: homenews
   resources:
     requests:
       cpu: 100m

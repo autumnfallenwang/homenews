@@ -47,7 +47,7 @@ Notes on the shape:
 
 ## Postgres password handling
 
-The current compose stack ships `POSTGRES_PASSWORD=homenews_prod` in plaintext. Two viable options:
+The current compose stack ships `POSTGRES_PASSWORD=homenews` in plaintext (the in-repo `compose.yaml` had aspirational `..._prod` suffixes for DB and password, but the actually-running container uses plain `homenews`/`homenews` — values realigned during Task 114 cutover prep to match the dev/legacy convention). Two viable options:
 
 1. **Plaintext in `values.yaml`** — LAN-only, no exposure beyond the cluster. Matches what's already in `deploy/compose.yaml`. Lowest friction.
 2. **Install Sealed Secrets first** — encrypts the password at rest in `arch-infra`. Listed in the reference doc as "next platform install when first DB password lands" and would land before homecal anyway.
@@ -71,21 +71,21 @@ kubectl get pod -n homenews -w   # wait for homenews-db-0 Running, 1/1 Ready
 
 # 2. Dump from the legacy container, restore into the cluster pod.
 docker exec homenews-db-prod \
-  pg_dump -U homenews -Fc homenews_prod \
+  pg_dump -U homenews -Fc homenews \
   > /tmp/homenews-prod.dump
 
 kubectl exec -n homenews -i homenews-db-0 -- \
-  pg_restore -U homenews -d homenews_prod --no-owner --no-acl \
+  pg_restore -U homenews -d homenews --no-owner --no-acl \
   < /tmp/homenews-prod.dump
 
 # 3. Verify extensions are present (the image includes them; the dump preserves CREATE EXTENSION).
 kubectl exec -n homenews homenews-db-0 -- \
-  psql -U homenews -d homenews_prod -c '\dx'
+  psql -U homenews -d homenews -c '\dx'
 # Expect: pgvector, pg_trgm
 
 # 4. Sanity-check row counts before flipping traffic.
 kubectl exec -n homenews homenews-db-0 -- \
-  psql -U homenews -d homenews_prod \
+  psql -U homenews -d homenews \
   -c 'SELECT (SELECT count(*) FROM articles) AS articles,
              (SELECT count(*) FROM article_analysis) AS analyses,
              (SELECT count(*) FROM highlights) AS highlights;'
@@ -117,7 +117,7 @@ This atomically rolls api + web together. Locking them to the same SHA matters b
 
 ## Networking specifics
 
-- **API → DB**: `DATABASE_URL=postgres://homenews:homenews_prod@homenews-db:5432/homenews_prod` (Service DNS, port 5432 direct).
+- **API → DB**: `DATABASE_URL=postgres://homenews:homenews@homenews-db:5432/homenews` (Service DNS, port 5432 direct).
 - **API → LLM gateway**: `LLM_GATEWAY_URL=http://llmgw.llmgw` (Service DNS, port 80 = llmgw's `targetPort: 51277`). No more `localhost:51277`. No more `network_mode: host`.
 - **Web → API**: `NEXT_PUBLIC_API_URL=http://homenews-api.arch.local` (build arg, baked into the standalone build). The browser hits the API directly through its own Ingress — no proxy hop.
 - **Pod-to-pod CORS**: API needs `Access-Control-Allow-Origin: http://homenews.arch.local` (or `*` for LAN). Already configured via Hono cors middleware — verify the env var maps correctly.
