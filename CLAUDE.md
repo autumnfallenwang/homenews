@@ -55,10 +55,11 @@ So dev reads `apps/api/.env` (gitignored, copy from `.env.example`); prod reads 
 **Dev workflow:**
 
 ```bash
-./scripts/db-start.sh                                                   # one-time per session
 pnpm --filter @homenews/api exec drizzle-kit push                       # only after schema changes
-pnpm dev                                                                # API on :3001, Web on :3000
+pnpm dev                                                                # auto-starts dev DB, then API :3001 + Web :3000
 ```
+
+The root `predev` script (`./scripts/db-start.sh`) auto-runs before `dev` via pnpm's npm-lifecycle hooks — idempotent (running container is a fast no-op, ~50ms). Skip this auto-start by invoking workspace-filtered: `pnpm --filter @homenews/api dev`.
 
 Web's `apps/web/src/lib/api.ts` defaults `NEXT_PUBLIC_API_URL` to `http://localhost:3001` when unset, so the web→api hop in dev needs no env config at all.
 
