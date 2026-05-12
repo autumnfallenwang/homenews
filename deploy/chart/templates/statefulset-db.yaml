@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "homenews.fullname" (dict "context" . "component" "db") }}
+  labels:
+    {{- include "homenews.labels" (dict "context" . "component" "db") | nindent 4 }}
+spec:
+  replicas: 1
+  # Governs per-pod DNS; points at the headless Service of the same name.
+  serviceName: {{ include "homenews.fullname" (dict "context" . "component" "db") }}
+  selector:
+    matchLabels:
+      {{- include "homenews.selectorLabels" (dict "context" . "component" "db") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "homenews.selectorLabels" (dict "context" . "component" "db") | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.db.podSecurityContext | nindent 8 }}
+      containers:
+        - name: postgres
+          image: "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
+          imagePullPolicy: {{ .Values.db.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            {{- range $k, $v := .Values.db.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            # PGDATA points at a subdirectory of the mount: postgres' initdb
+            # refuses to seed a non-empty directory, and local-path-provisioner
+            # may leave a `lost+found` (or similar) at the mount root depending
+            # on the underlying FS.
+            - name: PGDATA
+              value: {{ printf "%s/pgdata" .Values.db.persistence.mountPath | quote }}
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - {{ .Values.db.env.POSTGRES_USER | quote }}
+                - -d
+                - {{ .Values.db.env.POSTGRES_DB | quote }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - {{ .Values.db.env.POSTGRES_USER | quote }}
+                - -d
+                - {{ .Values.db.env.POSTGRES_DB | quote }}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.db.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.db.persistence.mountPath }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "homenews.labels" (dict "context" . "component" "db") | nindent 10 }}
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: {{ .Values.db.persistence.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.db.persistence.size }}

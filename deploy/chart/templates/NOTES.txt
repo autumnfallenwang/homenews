@@ -1,0 +1,30 @@
+homenews release {{ .Release.Name }} (chart {{ .Chart.Version }}, app {{ .Chart.AppVersion }}) deployed.
+
+Reach the apps:
+  Web:  curl http://{{ .Values.web.ingress.host }}/
+  API:  curl http://{{ .Values.api.ingress.host }}/health
+
+Tail logs:
+  kubectl logs -n {{ .Release.Namespace }} deploy/homenews-api -f
+  kubectl logs -n {{ .Release.Namespace }} deploy/homenews-web -f
+  kubectl logs -n {{ .Release.Namespace }} statefulset/homenews-db -f
+
+Trigger an end-to-end pipeline run:
+  curl -X POST http://{{ .Values.api.ingress.host }}/admin/pipeline/run-all
+
+Loki history (30d retention for {namespace="homenews"}):
+  curl -sG http://loki.arch.local/loki/api/v1/query_range \
+    --data-urlencode 'query={namespace="{{ .Release.Namespace }}"} | json | event="http.request"' \
+    --data-urlencode "start=$(date -u -d '-30 min' +%s)000000000" \
+    --data-urlencode "end=$(date -u +%s)000000000"
+
+Ops notes:
+  - api: single replica + Recreate strategy. The scheduler is a node-cron singleton
+    inside the API process; two replicas would double-fire fetch/analyze/summarize.
+  - db: single-replica StatefulSet with a ReadWriteOnce PVC ({{ .Values.db.persistence.size }} local-path).
+    Backups today have the same parity as the legacy docker volume (none) — revisit
+    when it bites.
+  - llm-gateway: reached via in-cluster Service DNS at LLM_GATEWAY_URL=http://llmgw.llmgw.
+    No more host-network workaround.
+  - DB password lives plaintext in values.yaml (LAN-only). Swap to Sealed Secrets
+    when the platform install lands — the swap is a no-downtime env-var source change.

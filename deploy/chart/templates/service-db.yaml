@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "homenews.fullname" (dict "context" . "component" "db") }}
+  labels:
+    {{- include "homenews.labels" (dict "context" . "component" "db") | nindent 4 }}
+spec:
+  # Headless: canonical pattern for stateful workloads. DNS for `homenews-db`
+  # returns the pod IP directly (no virtual IP, no L4 load balancing), and the
+  # StatefulSet's `serviceName` uses this Service as its governing service.
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: {{ .Values.db.service.port }}
+      targetPort: postgres
+      protocol: TCP
+      name: postgres
+  selector:
+    {{- include "homenews.selectorLabels" (dict "context" . "component" "db") | nindent 4 }}

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: homenews
+description: Personal AI news intelligence — api + web + pgvector Postgres
+type: application
+version: 0.1.0
+# appVersion is HomeNews-as-a-product, not any one component. Bump manually on
+# semver-significant releases; Dependabot does not touch this field. Mirrors the
+# llmgw chart's convention.
+appVersion: "0.1.0"

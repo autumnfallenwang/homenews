@@ -1,0 +1,142 @@
+# Default values for the homenews chart.
+# Override via `helm install --set` or the ArgoCD Application's
+# spec.source.helm.parameters in arch-infra/apps/homenews.yaml.
+#
+# Chart shape: three components (api, web, db) in one release. Helper
+# templates take a `(dict "context" . "component" "X")` argument so each
+# Deployment/StatefulSet gets its own labels + selectors.
+
+api:
+  image:
+    repository: ghcr.io/autumnfallenwang/homenews-api
+    # CI bumps `tag` to a commit SHA in the ArgoCD Application's parameters
+    # (`api.image.tag`). Web bumps in the same commit (`web.image.tag`) so
+    # api + web roll together.
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Scheduler is a node-cron singleton inside the API process; do not scale.
+  replicaCount: 1
+  service:
+    port: 80
+    targetPort: 52001
+  ingress:
+    enabled: true
+    className: traefik
+    host: homenews-api.arch.local
+  env:
+    API_PORT: "52001"
+    # In-cluster Service DNS for DB + LLM gateway (llmgw migrated to k3s).
+    DATABASE_URL: postgres://homenews:homenews_prod@homenews-db:5432/homenews_prod
+    LLM_GATEWAY_URL: http://llmgw.llmgw
+    LOG_LEVEL: info
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  probes:
+    liveness:
+      httpGet:
+        path: /health
+        port: 52001
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    readiness:
+      httpGet:
+        path: /health
+        port: 52001
+      initialDelaySeconds: 3
+      periodSeconds: 10
+
+web:
+  image:
+    repository: ghcr.io/autumnfallenwang/homenews-web
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    port: 80
+    targetPort: 52000
+  ingress:
+    enabled: true
+    className: traefik
+    host: homenews.arch.local
+  env:
+    PORT: "52000"
+    HOSTNAME: "0.0.0.0"
+    LOG_LEVEL: info
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  probes:
+    liveness:
+      httpGet:
+        path: /
+        port: 52000
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    readiness:
+      httpGet:
+        path: /
+        port: 52000
+      initialDelaySeconds: 3
+      periodSeconds: 10
+
+db:
+  # pgvector/pgvector:pg17 — Phase 15 needs pg_trgm + pgvector extensions,
+  # which the official postgres:17-alpine base doesn't ship.
+  image:
+    repository: pgvector/pgvector
+    tag: pg17
+    pullPolicy: IfNotPresent
+  service:
+    port: 5432
+    targetPort: 5432
+  persistence:
+    # Live volume on the legacy compose stack is 167MB. 5Gi is ~30× headroom,
+    # and local-path costs nothing until used — cheap to oversize.
+    size: 5Gi
+    storageClass: local-path
+    mountPath: /var/lib/postgresql/data
+  env:
+    POSTGRES_DB: homenews_prod
+    POSTGRES_USER: homenews
+    # Plaintext per Phase 17 memo decision (LAN-only). Move to Sealed Secrets
+    # later as a no-downtime swap.
+    POSTGRES_PASSWORD: homenews_prod
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  # Postgres image runs as UID/GID 999 (not the shared 1000). fsGroup 999 lets
+  # the postgres user write to the PVC. The shared `containerSecurityContext`
+  # still applies — its fields are container-level only and k8s drops them
+  # silently at pod scope (ref doc gotcha #4), so they don't belong here.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+
+# Pod- and container-level security contexts. api + web run as node UID 1000;
+# the DB pod runs as postgres UID 999 and overrides these in its template.
+# Per ref doc gotcha #4: allowPrivilegeEscalation/capabilities/readOnlyRootFilesystem
+# are container-level only — k8s silently drops them if placed on the pod.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
