@@ -66,6 +66,11 @@ web:
     PORT: "52000"
     HOSTNAME: "0.0.0.0"
     LOG_LEVEL: info
+    # Server-side fetches (SSR / server components / route handlers) go through
+    # cluster Service DNS — one hop, never leaves the pod network. The browser
+    # bundle still uses NEXT_PUBLIC_API_URL (baked at build time, public ingress
+    # hostname). lib/api.ts picks the right one based on runtime context.
+    API_URL: http://homenews-api.homenews
   resources:
     requests:
       cpu: 50m

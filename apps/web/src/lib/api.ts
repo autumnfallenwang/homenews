@@ -17,7 +17,14 @@ import type {
   UpdateFeed,
 } from "@homenews/shared";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// Two URLs intentionally — the Next.js server inside the cluster talks to the
+// API over cluster Service DNS (one hop, never leaves the pod network), while
+// the browser bundle uses the public ingress hostname. Next.js only inlines
+// NEXT_PUBLIC_* env vars into the client bundle, so on the browser
+// `process.env.API_URL` is `undefined` and the chain naturally falls through
+// to `NEXT_PUBLIC_API_URL` (baked at build time). On the server, `API_URL`
+// is read from runtime env and wins.
+const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 // Phase 13 server-side filter inputs. Mirror of `rankedQuerySchema` in the
 // shared package, one per query param. Snake_case for score/date fields
