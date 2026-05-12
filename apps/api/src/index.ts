@@ -4,7 +4,7 @@ import { log } from "./lib/logger.js";
 import { applyScheduleFromSettings } from "./services/scheduler.js";
 import { seedDefaults } from "./services/settings.js";
 
-const port = Number(process.env.PORT ?? 3001);
+const port = Number(process.env.API_PORT ?? process.env.PORT ?? 3001);
 
 serve({ fetch: app.fetch, port }, async () => {
   log.info({ event: "server.start", port }, "API server listening");
