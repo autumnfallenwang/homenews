@@ -36,6 +36,32 @@ All commands run from the repo root via Turborepo:
 - `cd apps/ios/HomeNews.swiftpm && xcodebuild build -scheme HomeNews -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -quiet` — build iOS app
 - `cd apps/ios/HomeNews.swiftpm && swiftlint` — lint Swift code
 
+## Local dev
+
+The codebase is 12-factor — dev and prod run identical code; only the env differs. The dev/prod split is in `apps/api/package.json`:
+
+- `"dev": "tsx watch --env-file=.env src/index.ts"` — loads `apps/api/.env` at startup
+- `"start": "tsx src/index.ts"` — no `--env-file`; relies on env vars injected by the container runtime (k8s chart in prod)
+
+So dev reads `apps/api/.env` (gitignored, copy from `.env.example`); prod reads env values defined in `deploy/chart/values.yaml`'s `api.env` block. Same `process.env.DATABASE_URL` line in code, different value at runtime.
+
+**Dev infra:**
+
+- **DB**: `./scripts/db-start.sh` spins up a local `homenews-postgres` container on `localhost:5433` (pgvector/pgvector:pg17, named volume `homenews-pgdata`). Separate from the cluster's data — refactors and replays can't touch prod.
+  - `./scripts/db-stop.sh` to stop, `./scripts/db-reset.sh` to wipe + recreate.
+  - First-time setup: `pnpm --filter @homenews/api exec drizzle-kit push` applies the schema to the empty local DB.
+- **LLM gateway**: dev reuses the cluster's llmgw via the existing ingress at `http://llmgw.arch.local` (Traefik on the same host, `/etc/hosts` already routes it). No separate dev gateway process to manage.
+
+**Dev workflow:**
+
+```bash
+./scripts/db-start.sh                                                   # one-time per session
+pnpm --filter @homenews/api exec drizzle-kit push                       # only after schema changes
+pnpm dev                                                                # API on :3001, Web on :3000
+```
+
+Web's `apps/web/src/lib/api.ts` defaults `NEXT_PUBLIC_API_URL` to `http://localhost:3001` when unset, so the web→api hop in dev needs no env config at all.
+
 ## Cluster ops (post-Phase 17, GitOps)
 
 Prod lives in the k3s cluster managed by `arch-infra`. ArgoCD owns the lifecycle (start/stop/scale/upgrade); humans `git push` and let CI + ArgoCD do the rest. The chart at `deploy/chart/` is the source of truth.
