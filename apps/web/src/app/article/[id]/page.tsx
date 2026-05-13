@@ -1,6 +1,5 @@
 import { ALLOWED_TAGS } from "@homenews/shared";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
-import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { notFound } from "next/navigation";
 import { fetchArticleHighlights, fetchArticleInteraction, fetchRankedArticle } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -73,13 +72,8 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      <Link
-        href="/"
-        className="mb-10 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="h-3 w-3" />
-        Back to briefing
-      </Link>
+      {/* Phase 18 Task 126: the inline "Back to briefing" link is gone —
+          AppSidebar's Shape B Back row carries that affordance now. */}
 
       {/* Meta eyebrow — source · author · publishedAt · reading time · pending badge */}
       <div className="mb-4 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
