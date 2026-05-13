@@ -5,7 +5,6 @@ import { ArticleRow } from "./article-row";
 import { DashboardShell } from "./dashboard-shell";
 import { FilterBar } from "./filter-bar";
 import { Pager } from "./pager";
-import { PipelineControl } from "./pipeline-control";
 
 const PAGE_SIZE = 50;
 
@@ -85,35 +84,32 @@ export default async function Home({ searchParams }: { searchParams: Promise<Raw
   const sourceCount = new Set(articles.map((a) => a.article.feedName)).size;
 
   return (
-    <>
-      <PipelineControl />
-      <DashboardShell>
-        <main className="mx-auto max-w-6xl px-6 py-10">
-          <DashboardHeader
-            articleCount={articles.length}
-            totalCount={total}
-            sourceCount={sourceCount}
-            feedCount={feeds.length}
-            avgComposite={avgComposite}
-          />
-          <FilterBar
-            initialFilters={filters}
-            availableSources={availableSources}
-            availableCategories={availableCategories}
-            availableTags={availableTags}
-            facets={facets}
-          />
-          <ArticleListShell>
-            {articles.length === 0 ? (
-              <EmptyState />
-            ) : (
-              articles.map((item) => <ArticleRow key={item.id} item={item} />)
-            )}
-          </ArticleListShell>
-          <Pager currentPage={currentPage} totalPages={totalPages} />
-        </main>
-      </DashboardShell>
-    </>
+    <DashboardShell>
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        <DashboardHeader
+          articleCount={articles.length}
+          totalCount={total}
+          sourceCount={sourceCount}
+          feedCount={feeds.length}
+          avgComposite={avgComposite}
+        />
+        <FilterBar
+          initialFilters={filters}
+          availableSources={availableSources}
+          availableCategories={availableCategories}
+          availableTags={availableTags}
+          facets={facets}
+        />
+        <ArticleListShell>
+          {articles.length === 0 ? (
+            <EmptyState />
+          ) : (
+            articles.map((item) => <ArticleRow key={item.id} item={item} />)
+          )}
+        </ArticleListShell>
+        <Pager currentPage={currentPage} totalPages={totalPages} />
+      </main>
+    </DashboardShell>
   );
 }
 
@@ -187,8 +183,8 @@ function HeaderDescription({
   }
   return (
     <>
-      No articles yet. Run the pipeline above to fetch the latest from your feeds, or wait for the
-      next scheduled tick.
+      No articles yet. Trigger a run from the <span className="text-foreground">Pipeline</span> page
+      in the sidebar to fetch the latest from your feeds, or wait for the next scheduled tick.
     </>
   );
 }
