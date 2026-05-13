@@ -50,12 +50,22 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/pipeline", label: "Pipeline", icon: Zap },
 ] as const;
 
-export function AppSidebar() {
+export function AppSidebar({ contextualContent }: { contextualContent?: React.ReactNode }) {
   const pathname = usePathname();
-  return isTopLevel(pathname) ? <ShapeA pathname={pathname} /> : <ShapeB />;
+  return isTopLevel(pathname) ? (
+    <ShapeA pathname={pathname} contextualContent={contextualContent} />
+  ) : (
+    <ShapeB contextualContent={contextualContent} />
+  );
 }
 
-function ShapeA({ pathname }: { pathname: TopLevelRoute }) {
+function ShapeA({
+  pathname,
+  contextualContent,
+}: {
+  pathname: TopLevelRoute;
+  contextualContent?: React.ReactNode;
+}) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -83,8 +93,7 @@ function ShapeA({ pathname }: { pathname: TopLevelRoute }) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {/* Page-specific contextual zone lands here in later tasks
-            (dashboard filter accordion, pipeline run history, etc.). */}
+        {contextualContent}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
@@ -100,7 +109,7 @@ function ShapeA({ pathname }: { pathname: TopLevelRoute }) {
   );
 }
 
-function ShapeB() {
+function ShapeB({ contextualContent }: { contextualContent?: React.ReactNode }) {
   const router = useRouter();
   return (
     <Sidebar collapsible="icon">
@@ -119,10 +128,7 @@ function ShapeB() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        {/* Sub-page controls land here in later tasks
-            (settings sub-tabs, article TOC, etc.). */}
-      </SidebarContent>
+      <SidebarContent>{contextualContent}</SidebarContent>
     </Sidebar>
   );
 }

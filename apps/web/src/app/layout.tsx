@@ -33,7 +33,18 @@ export const metadata: Metadata = {
   description: "Personal AI news intelligence",
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+  sidebar,
+}: {
+  children: React.ReactNode;
+  // `sidebar` is the @sidebar parallel-route slot. Each top-level route can
+  // contribute its own @sidebar/<route>/page.tsx; routes without one render
+  // @sidebar/default.tsx (currently `null`). The slot content is server-
+  // rendered with the route's searchParams, so URL-driven data (filters,
+  // facets, etc.) flows in cleanly without a client-fetch waterfall.
+  sidebar: React.ReactNode;
+}) {
   const cookieStore = await cookies();
   const themePref = (cookieStore.get(THEME_COOKIE)?.value ?? "dark") as Theme;
   const ssrClass = resolveThemeForSsr(cookieStore.get(THEME_COOKIE)?.value);
@@ -48,7 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeApplier initialPref={themePref} />
         <TooltipProvider>
           <SidebarProvider>
-            <AppSidebar />
+            <AppSidebar contextualContent={sidebar} />
             <SidebarInset>{children}</SidebarInset>
           </SidebarProvider>
         </TooltipProvider>

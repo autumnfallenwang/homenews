@@ -1,9 +1,8 @@
-import { ALLOWED_TAGS, type AnalyzedArticle, type Feed, type RankedFacets } from "@homenews/shared";
+import type { AnalyzedArticle, Feed } from "@homenews/shared";
 import { fetchFeeds, fetchRanked, type RankedFilters } from "@/lib/api";
 import { ArticleListShell } from "./article-list-shell";
 import { ArticleRow } from "./article-row";
 import { DashboardShell } from "./dashboard-shell";
-import { FilterBar } from "./filter-bar";
 import { Pager } from "./pager";
 
 const PAGE_SIZE = 50;
@@ -48,29 +47,22 @@ export default async function Home({ searchParams }: { searchParams: Promise<Raw
   let articles: AnalyzedArticle[] = [];
   let feeds: Feed[] = [];
   let total = 0;
-  let facets: RankedFacets | null = null;
 
   try {
-    // Facet counts ride along with every list fetch — the ~15ms overhead on
-    // pagination flips is not material, and skipping facets on page 2+ would
-    // blank out the chip counts mid-navigation.
+    // Filter UI moved into the @sidebar slot; this page no longer renders
+    // the facet chips itself, but `includeFacets: true` is kept so this
+    // request URL matches the sidebar's and Next.js dedups them into one
+    // network call per render.
     const [rankedRes, feedsList] = await Promise.all([
       fetchRanked({ ...filters, limit: PAGE_SIZE, offset, includeFacets: true }),
       fetchFeeds(),
     ]);
     articles = rankedRes.rows;
     total = rankedRes.total;
-    facets = rankedRes.facets ?? null;
     feeds = feedsList;
   } catch {
     // API unavailable — show empty state
   }
-
-  const availableSources = [...new Set(feeds.filter((f) => f.enabled).map((f) => f.name))].sort();
-  const availableCategories = [
-    ...new Set(feeds.map((f) => f.category).filter((c): c is string => Boolean(c))),
-  ].sort();
-  const availableTags = [...ALLOWED_TAGS];
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(totalPages, Math.floor(offset / PAGE_SIZE) + 1);
@@ -92,13 +84,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Raw
           sourceCount={sourceCount}
           feedCount={feeds.length}
           avgComposite={avgComposite}
-        />
-        <FilterBar
-          initialFilters={filters}
-          availableSources={availableSources}
-          availableCategories={availableCategories}
-          availableTags={availableTags}
-          facets={facets}
         />
         <ArticleListShell>
           {articles.length === 0 ? (
