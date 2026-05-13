@@ -2,10 +2,9 @@
 
 import type { Setting } from "@homenews/shared";
 import { Loader2, Plus, RotateCcw, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -146,20 +145,28 @@ function valuesEqual(a: unknown, b: unknown): boolean {
 }
 
 export function SettingsForm({ initialSettings, initialTab }: SettingsFormProps) {
-  const router = useRouter();
+  const searchParams = useSearchParams();
   const [savedValues, setSavedValues] = useState<Record<string, unknown>>(
     indexValues(initialSettings),
   );
   const [descriptions] = useState<Record<string, string>>(indexDescriptions(initialSettings));
   const [localValues, setLocalValues] = useState<Record<string, unknown>>({});
-  const [activeTab, setActiveTab] = useState<TabId>(
-    isValidTab(initialTab) ? initialTab : "scoring",
-  );
-  const [pendingTab, setPendingTab] = useState<TabId | null>(null);
   const [busy, setBusy] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [feedsDirty, setFeedsDirty] = useState(false);
   const feedsActionsRef = useRef<FeedsSectionActions | null>(null);
+
+  // Phase 18 Task 125: activeTab is read from the URL each render. The tab
+  // nav lives in the AppSidebar's Shape B contextual zone now (parallel
+  // route at @sidebar/settings/page.tsx); clicking a tab navigates via
+  // <Link>, which updates ?tab=, which feeds back here. localValues is keyed
+  // by setting key (not tab), so switching tabs with unsaved edits doesn't
+  // lose them — the user can navigate back and find the dirty state intact,
+  // it's just out of the SaveBar's view while away.
+  const tabFromUrl = searchParams.get("tab");
+  let activeTab: TabId = "scoring";
+  if (isValidTab(tabFromUrl ?? "")) activeTab = tabFromUrl as TabId;
+  else if (isValidTab(initialTab)) activeTab = initialTab;
 
   const handleFeedsDirtyChange = useCallback((d: boolean) => setFeedsDirty(d), []);
 
@@ -252,24 +259,6 @@ export function SettingsForm({ initialSettings, initialTab }: SettingsFormProps)
     });
   }
 
-  function selectTab(tabId: TabId) {
-    if (tabId === activeTab) return;
-    if (tabHasDirty(activeTab)) {
-      setPendingTab(tabId);
-      return;
-    }
-    setActiveTab(tabId);
-    router.replace(`/settings?tab=${tabId}`, { scroll: false });
-  }
-
-  function discardAndSwitch() {
-    if (!pendingTab) return;
-    cancelTab(activeTab);
-    setActiveTab(pendingTab);
-    router.replace(`/settings?tab=${pendingTab}`, { scroll: false });
-    setPendingTab(null);
-  }
-
   async function handleResetAll() {
     if (!window.confirm("Reset ALL settings to defaults? This cannot be undone.")) return;
     setResetting(true);
@@ -281,7 +270,6 @@ export function SettingsForm({ initialSettings, initialTab }: SettingsFormProps)
     }
   }
 
-  const dirtyTabIds = new Set(TABS.filter((t) => tabHasDirty(t.id)).map((t) => t.id));
   const activeTabDef = TABS.find((t) => t.id === activeTab) ?? TABS[0];
 
   return (
@@ -304,96 +292,35 @@ export function SettingsForm({ initialSettings, initialTab }: SettingsFormProps)
           type="button"
           onClick={handleResetAll}
           disabled={resetting}
-          className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card/30 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive disabled:opacity-40"
         >
           <RotateCcw className="h-3 w-3" />
           Reset all
         </button>
       </header>
 
-      {/* Tabbed layout */}
-      <div className="grid grid-cols-[220px_1fr] gap-0 border border-border bg-card/20">
-        <Sidebar tabs={TABS} activeTab={activeTab} dirtyTabs={dirtyTabIds} onSelect={selectTab} />
-
-        <div className="relative min-h-[480px]">
-          <ContentPane
-            tab={activeTabDef}
-            getValue={getValue}
-            getDescription={getDescription}
-            setLocal={setLocal}
-            isDirty={isDirty}
-            busy={busy}
-            feedsActionsRef={feedsActionsRef}
-            onFeedsDirtyChange={handleFeedsDirtyChange}
-          />
-          <SaveBar
-            busy={busy}
-            dirty={tabHasDirty(activeTab)}
-            onCancel={() => cancelTab(activeTab)}
-            onSave={() => saveTab(activeTab)}
-          />
-        </div>
+      {/* Phase 18 Task 125: tabs nav moved to AppSidebar (parallel route at
+          @sidebar/settings). Main area is full-width content + SaveBar.
+          The inner <Sidebar> parallel column from Phase 7 is gone. */}
+      <div className="relative min-h-[480px] border-t border-border">
+        <ContentPane
+          tab={activeTabDef}
+          getValue={getValue}
+          getDescription={getDescription}
+          setLocal={setLocal}
+          isDirty={isDirty}
+          busy={busy}
+          feedsActionsRef={feedsActionsRef}
+          onFeedsDirtyChange={handleFeedsDirtyChange}
+        />
+        <SaveBar
+          busy={busy}
+          dirty={tabHasDirty(activeTab)}
+          onCancel={() => cancelTab(activeTab)}
+          onSave={() => saveTab(activeTab)}
+        />
       </div>
-
-      <UnsavedDialog
-        open={pendingTab !== null}
-        onCancel={() => setPendingTab(null)}
-        onDiscard={discardAndSwitch}
-      />
     </div>
-  );
-}
-
-// --- Sidebar ---
-
-function Sidebar({
-  tabs,
-  activeTab,
-  dirtyTabs,
-  onSelect,
-}: {
-  tabs: TabDef[];
-  activeTab: TabId;
-  dirtyTabs: Set<TabId>;
-  onSelect: (id: TabId) => void;
-}) {
-  return (
-    <nav aria-label="Settings sections" className="border-r border-border bg-card/40 py-4">
-      <div className="mb-3 px-4 font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground/70">
-        Sections
-      </div>
-      <ul className="space-y-px">
-        {tabs.map((tab) => {
-          const isActive = tab.id === activeTab;
-          const isDirty = dirtyTabs.has(tab.id);
-          return (
-            <li key={tab.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(tab.id)}
-                className={cn(
-                  "group flex w-full items-center justify-between gap-2 border-l-2 px-4 py-2 text-left transition-colors",
-                  isActive
-                    ? "border-primary bg-card/80 text-foreground"
-                    : "border-transparent text-muted-foreground hover:bg-card/40 hover:text-foreground",
-                )}
-              >
-                <span className="font-mono text-[11px] uppercase tracking-[0.12em]">
-                  {tab.label}
-                </span>
-                {isDirty && (
-                  <span
-                    className="h-1.5 w-1.5 rounded-full bg-primary"
-                    title="Unsaved changes"
-                    aria-hidden
-                  />
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
   );
 }
 
@@ -910,47 +837,3 @@ function SaveBar({
 }
 
 // --- Unsaved changes dialog ---
-
-function UnsavedDialog({
-  open,
-  onCancel,
-  onDiscard,
-}: {
-  open: boolean;
-  onCancel: () => void;
-  onDiscard: () => void;
-}) {
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) onCancel();
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="font-display text-[18px]">Unsaved changes</DialogTitle>
-        </DialogHeader>
-        <p className="text-[13px] leading-relaxed text-muted-foreground">
-          You have unsaved changes in this section. Switching tabs will discard them.
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-sm border border-border bg-card/30 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Keep editing
-          </button>
-          <button
-            type="button"
-            onClick={onDiscard}
-            className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-destructive transition-all hover:border-destructive hover:bg-destructive hover:text-destructive-foreground"
-          >
-            Discard &amp; switch
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
