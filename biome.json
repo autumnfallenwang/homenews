@@ -20,6 +20,15 @@
         "rules": {
           "security": {
             "noSecrets": "off"
+          },
+          "nursery": {
+            "noShadow": "off"
+          },
+          "suspicious": {
+            "noDocumentCookie": "off"
+          },
+          "correctness": {
+            "useExhaustiveDependencies": "off"
           }
         }
       }
