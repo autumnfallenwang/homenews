@@ -181,7 +181,7 @@ function ArticleResultCard({ row }: { row: Extract<SearchResult, { kind: "articl
   return (
     <Link
       href={`/article/${row.article.analysisId}`}
-      className="block border border-border bg-card/30 px-5 py-4 transition-colors hover:bg-card/50"
+      className="group block border-b border-border py-5 transition-colors"
     >
       <div className="mb-2 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
         <span className="text-foreground/80">{row.article.feedName}</span>
@@ -197,7 +197,7 @@ function ArticleResultCard({ row }: { row: Extract<SearchResult, { kind: "articl
           {row.score.toFixed(2)}
         </span>
       </div>
-      <h3 className="font-display text-[18px] font-medium leading-[1.25] tracking-tight text-foreground">
+      <h3 className="font-display text-[18px] font-medium leading-[1.25] tracking-tight text-foreground transition-colors group-hover:text-primary">
         {row.article.title}
       </h3>
       {row.snippet && (
@@ -211,7 +211,7 @@ function ArticleResultCard({ row }: { row: Extract<SearchResult, { kind: "articl
 
 function HighlightResultCard({ row }: { row: Extract<SearchResult, { kind: "highlight" }> }) {
   return (
-    <div className="border border-border bg-card/30 px-5 py-4">
+    <div className="border-b border-border py-5">
       <div className="mb-3 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
         <span className="text-primary/80">Highlight</span>
         <span className="text-muted-foreground/40">·</span>

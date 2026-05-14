@@ -1,5 +1,6 @@
 import type { AnalyzedArticle, Feed } from "@homenews/shared";
 import { fetchFeeds, fetchRanked, type RankedFilters } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { ArticleListShell } from "./article-list-shell";
 import { ArticleRow } from "./article-row";
 import { DashboardShell } from "./dashboard-shell";
@@ -188,11 +189,9 @@ function MetricStrip({
   avgComposite: number;
 }) {
   return (
-    <div className="hidden items-stretch gap-0 overflow-hidden rounded-sm border border-border bg-card/40 sm:flex">
+    <div className="hidden items-baseline gap-6 sm:flex">
       <Metric label="Shown" value={`${articleCount}/${totalCount}`} />
-      <Divider />
       <Metric label="Sources" value={`${sourceCount}/${feedCount}`} />
-      <Divider />
       <Metric label="Avg score" value={avgComposite} accent />
     </div>
   );
@@ -208,23 +207,20 @@ function Metric({
   accent?: boolean;
 }) {
   return (
-    <div className="px-4 py-2.5">
-      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+    <div className="flex items-baseline gap-2">
+      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
         {label}
-      </div>
-      <div
-        className={`tabular font-mono text-[15px] leading-none mt-1 ${
-          accent ? "text-primary" : "text-foreground"
-        }`}
+      </span>
+      <span
+        className={cn(
+          "tabular font-mono text-[15px] leading-none",
+          accent ? "text-primary" : "text-foreground",
+        )}
       >
         {value}
-      </div>
+      </span>
     </div>
   );
-}
-
-function Divider() {
-  return <span className="w-px bg-border" aria-hidden />;
 }
 
 function EmptyState() {

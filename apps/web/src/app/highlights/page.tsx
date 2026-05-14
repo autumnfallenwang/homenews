@@ -52,12 +52,9 @@ export default async function HighlightsPage() {
       </header>
 
       {highlights.length > 0 && (
-        <ul className="flex flex-col gap-5">
+        <ul className="flex flex-col">
           {highlights.map((h) => (
-            <li
-              key={h.id}
-              className="border border-border bg-card/30 px-5 py-4 transition-colors hover:bg-card/50"
-            >
+            <li key={h.id} className="border-b border-border py-6">
               <blockquote className="border-l-2 border-primary/60 pl-4 font-display text-[16px] italic leading-relaxed text-foreground">
                 “{h.text}”
               </blockquote>
@@ -66,7 +63,7 @@ export default async function HighlightsPage() {
                   {h.note}
                 </p>
               )}
-              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-3 pl-4 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              <div className="mt-4 flex flex-wrap items-center gap-3 pl-4 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                 <Link
                   href={`/article/${h.article.analysisId}`}
                   className="inline-flex max-w-full items-baseline gap-1 truncate font-display text-[13px] italic normal-case tracking-normal text-foreground transition-colors hover:text-primary"

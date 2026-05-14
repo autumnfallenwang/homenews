@@ -149,7 +149,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Score strip — moved below the body so it reads as metadata, not hero */}
-      <div className="mt-6 overflow-hidden rounded-sm border border-border bg-card/30">
+      <div className="mt-6 border-y border-border">
         <div className="border-b border-border">
           <ScoreCell label="Composite" value={composite} accent />
         </div>
@@ -188,7 +188,7 @@ function ExtractionNotice({
   link: string;
 }) {
   return (
-    <section className="rounded-sm border border-border bg-card/40 p-5">
+    <section className="border-y border-border py-5">
       <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
         {failed ? "Extraction failed" : "Extraction pending"}
       </div>
