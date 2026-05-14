@@ -6,7 +6,7 @@ import {
   type SearchResult,
   type SearchTarget,
 } from "@homenews/shared";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { fetchSearch } from "@/lib/api";
@@ -102,14 +102,8 @@ export default async function SearchPage({
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      <Link
-        href="/"
-        className="mb-10 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="h-3 w-3" />
-        Back to briefing
-      </Link>
-
+      {/* Phase 18 Task 127: the inline "Back to briefing" link is gone —
+          AppSidebar's primary nav carries cross-page navigation now. */}
       <header className="mb-10">
         <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
           Your knowledge base
