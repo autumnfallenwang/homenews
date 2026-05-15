@@ -60,10 +60,7 @@ export async function llmExecute(task: LlmTaskName, prompt: string): Promise<Llm
     parsed = extractJson(raw);
   }
 
-  log.info(
-    { event: "llm.ok", task, model, duration_ms: durationMs },
-    "LLM call succeeded",
-  );
+  log.info({ event: "llm.ok", task, model, duration_ms: durationMs }, "LLM call succeeded");
 
   return { raw, parsed, task, model, durationMs };
 }

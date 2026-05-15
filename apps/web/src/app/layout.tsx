@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
-import Link from "next/link";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { resolveThemeForSsr, THEME_COOKIE, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { AppSidebar } from "./app-sidebar";
 import { ThemeApplier } from "./theme-applier";
 import "./globals.css";
 
@@ -31,7 +33,18 @@ export const metadata: Metadata = {
   description: "Personal AI news intelligence",
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+  sidebar,
+}: {
+  children: React.ReactNode;
+  // `sidebar` is the @sidebar parallel-route slot. Each top-level route can
+  // contribute its own @sidebar/<route>/page.tsx; routes without one render
+  // @sidebar/default.tsx (currently `null`). The slot content is server-
+  // rendered with the route's searchParams, so URL-driven data (filters,
+  // facets, etc.) flows in cleanly without a client-fetch waterfall.
+  sidebar: React.ReactNode;
+}) {
   const cookieStore = await cookies();
   const themePref = (cookieStore.get(THEME_COOKIE)?.value ?? "dark") as Theme;
   const ssrClass = resolveThemeForSsr(cookieStore.get(THEME_COOKIE)?.value);
@@ -44,50 +57,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className="font-sans bg-background text-foreground bg-grain min-h-screen">
         <ThemeApplier initialPref={themePref} />
-        <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-          <div className="mx-auto flex h-14 max-w-6xl items-center gap-8 px-6">
-            <Link
-              href="/"
-              className="group flex items-baseline gap-2 select-none"
-              aria-label="HomeNews home"
-            >
-              <span className="font-display text-xl font-medium tracking-tight text-foreground">
-                Home<span className="text-primary">News</span>
-              </span>
-              <span className="hidden font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:inline">
-                v0.5
-              </span>
-            </Link>
-            <nav className="flex items-center gap-1 text-[13px]">
-              <NavLink href="/" label="Dashboard" />
-              <NavLink href="/search" label="Search" />
-              <NavLink href="/highlights" label="Highlights" />
-              <NavLink href="/settings" label="Settings" />
-            </nav>
-            <div className="ml-auto flex items-center gap-3">
-              <span className="hidden font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground md:inline">
-                Workstation
-              </span>
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
-            </div>
-          </div>
-        </header>
-        {children}
+        <TooltipProvider>
+          <SidebarProvider>
+            <AppSidebar contextualContent={sidebar} />
+            <SidebarInset>{children}</SidebarInset>
+          </SidebarProvider>
+        </TooltipProvider>
       </body>
     </html>
-  );
-}
-
-function NavLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "rounded-sm px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground transition-colors",
-        "hover:text-foreground hover:bg-secondary/60",
-      )}
-    >
-      {label}
-    </Link>
   );
 }

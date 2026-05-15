@@ -1,11 +1,11 @@
-import { ALLOWED_TAGS, type AnalyzedArticle, type Feed, type RankedFacets } from "@homenews/shared";
+import type { AnalyzedArticle, Feed } from "@homenews/shared";
+import { PageHeader } from "@/components/page-header";
+import { RefreshButton } from "@/components/refresh-button";
 import { fetchFeeds, fetchRanked, type RankedFilters } from "@/lib/api";
 import { ArticleListShell } from "./article-list-shell";
 import { ArticleRow } from "./article-row";
 import { DashboardShell } from "./dashboard-shell";
-import { FilterBar } from "./filter-bar";
 import { Pager } from "./pager";
-import { PipelineControl } from "./pipeline-control";
 
 const PAGE_SIZE = 50;
 
@@ -49,29 +49,22 @@ export default async function Home({ searchParams }: { searchParams: Promise<Raw
   let articles: AnalyzedArticle[] = [];
   let feeds: Feed[] = [];
   let total = 0;
-  let facets: RankedFacets | null = null;
 
   try {
-    // Facet counts ride along with every list fetch — the ~15ms overhead on
-    // pagination flips is not material, and skipping facets on page 2+ would
-    // blank out the chip counts mid-navigation.
+    // Filter UI moved into the @sidebar slot; this page no longer renders
+    // the facet chips itself, but `includeFacets: true` is kept so this
+    // request URL matches the sidebar's and Next.js dedups them into one
+    // network call per render.
     const [rankedRes, feedsList] = await Promise.all([
       fetchRanked({ ...filters, limit: PAGE_SIZE, offset, includeFacets: true }),
       fetchFeeds(),
     ]);
     articles = rankedRes.rows;
     total = rankedRes.total;
-    facets = rankedRes.facets ?? null;
     feeds = feedsList;
   } catch {
     // API unavailable — show empty state
   }
-
-  const availableSources = [...new Set(feeds.filter((f) => f.enabled).map((f) => f.name))].sort();
-  const availableCategories = [
-    ...new Set(feeds.map((f) => f.category).filter((c): c is string => Boolean(c))),
-  ].sort();
-  const availableTags = [...ALLOWED_TAGS];
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(totalPages, Math.floor(offset / PAGE_SIZE) + 1);
@@ -84,166 +77,51 @@ export default async function Home({ searchParams }: { searchParams: Promise<Raw
   const avgComposite = Number.isFinite(avgCompositeRaw) ? Math.round(avgCompositeRaw) : 0;
   const sourceCount = new Set(articles.map((a) => a.article.feedName)).size;
 
+  const status = buildStatus(articles.length, total, sourceCount, feeds.length, avgComposite);
+
   return (
-    <>
-      <PipelineControl />
-      <DashboardShell>
-        <main className="mx-auto max-w-6xl px-6 py-10">
-          <DashboardHeader
-            articleCount={articles.length}
-            totalCount={total}
-            sourceCount={sourceCount}
-            feedCount={feeds.length}
-            avgComposite={avgComposite}
-          />
-          <FilterBar
-            initialFilters={filters}
-            availableSources={availableSources}
-            availableCategories={availableCategories}
-            availableTags={availableTags}
-            facets={facets}
-          />
-          <ArticleListShell>
-            {articles.length === 0 ? (
-              <EmptyState />
-            ) : (
-              articles.map((item) => <ArticleRow key={item.id} item={item} />)
-            )}
-          </ArticleListShell>
-          <Pager currentPage={currentPage} totalPages={totalPages} />
-        </main>
-      </DashboardShell>
-    </>
+    <DashboardShell>
+      <PageHeader title="Dashboard" status={status} actions={<RefreshButton />} />
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <ArticleListShell>
+          {articles.length === 0 ? (
+            <EmptyState />
+          ) : (
+            articles.map((item) => <ArticleRow key={item.id} item={item} />)
+          )}
+        </ArticleListShell>
+        <Pager currentPage={currentPage} totalPages={totalPages} />
+      </main>
+    </DashboardShell>
   );
 }
 
-function DashboardHeader({
-  articleCount,
-  totalCount,
-  sourceCount,
-  feedCount,
-  avgComposite,
-}: {
-  articleCount: number;
-  totalCount: number;
-  sourceCount: number;
-  feedCount: number;
-  avgComposite: number;
-}) {
-  return (
-    <header className="mb-10">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          Today's Briefing
-        </span>
-        <MetricStrip
-          articleCount={articleCount}
-          totalCount={totalCount}
-          sourceCount={sourceCount}
-          feedCount={feedCount}
-          avgComposite={avgComposite}
-        />
-      </div>
-      <h1 className="font-display text-[2.75rem] leading-[1.05] tracking-tight text-foreground">
-        The day in <span className="text-primary">AI</span>.
-      </h1>
-      <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
-        <HeaderDescription
-          articleCount={articleCount}
-          totalCount={totalCount}
-          sourceCount={sourceCount}
-        />
-      </p>
-    </header>
-  );
-}
-
-function HeaderDescription({
-  articleCount,
-  totalCount,
-  sourceCount,
-}: {
-  articleCount: number;
-  totalCount: number;
-  sourceCount: number;
-}) {
-  if (articleCount > 0) {
+function buildStatus(
+  articleCount: number,
+  totalCount: number,
+  sourceCount: number,
+  feedCount: number,
+  avgComposite: number,
+) {
+  if (totalCount === 0) {
     return (
-      <>
-        <span className="text-foreground">{articleCount}</span> of{" "}
-        <span className="text-foreground">{totalCount}</span> articles shown, drawn from{" "}
-        <span className="text-foreground">{sourceCount}</span> active sources. Refine via the filter
-        bar below — all queries run server-side against the full corpus.
-      </>
-    );
-  }
-  if (totalCount > 0) {
-    return (
-      <>
-        No articles match the current filters. <span className="text-foreground">{totalCount}</span>{" "}
-        articles in the corpus overall — loosen or reset filters to find them.
-      </>
+      <span>
+        No articles yet —{" "}
+        <span className="text-foreground/80">run the pipeline to fetch your feeds</span>
+      </span>
     );
   }
   return (
-    <>
-      No articles yet. Run the pipeline above to fetch the latest from your feeds, or wait for the
-      next scheduled tick.
-    </>
+    <span>
+      <span className="text-foreground">{articleCount}</span>
+      <span className="text-muted-foreground/60"> of </span>
+      <span className="text-foreground">{totalCount.toLocaleString()}</span>
+      <span className="text-muted-foreground/60"> · </span>
+      <span className="text-foreground">{sourceCount}</span>
+      <span className="text-muted-foreground/60">/{feedCount} sources · avg </span>
+      <span className="text-primary">{avgComposite}</span>
+    </span>
   );
-}
-
-function MetricStrip({
-  articleCount,
-  totalCount,
-  sourceCount,
-  feedCount,
-  avgComposite,
-}: {
-  articleCount: number;
-  totalCount: number;
-  sourceCount: number;
-  feedCount: number;
-  avgComposite: number;
-}) {
-  return (
-    <div className="hidden items-stretch gap-0 overflow-hidden rounded-sm border border-border bg-card/40 sm:flex">
-      <Metric label="Shown" value={`${articleCount}/${totalCount}`} />
-      <Divider />
-      <Metric label="Sources" value={`${sourceCount}/${feedCount}`} />
-      <Divider />
-      <Metric label="Avg score" value={avgComposite} accent />
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number | string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="px-4 py-2.5">
-      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
-      </div>
-      <div
-        className={`tabular font-mono text-[15px] leading-none mt-1 ${
-          accent ? "text-primary" : "text-foreground"
-        }`}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Divider() {
-  return <span className="w-px bg-border" aria-hidden />;
 }
 
 function EmptyState() {

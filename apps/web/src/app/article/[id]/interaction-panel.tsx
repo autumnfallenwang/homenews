@@ -45,9 +45,17 @@ export function InteractionPanel({ articleId, initialInteraction }: InteractionP
   }
 
   return (
-    <section className="my-8 border-y border-border bg-card/20 px-5 py-4">
-      {/* Toggle row */}
-      <div className="flex flex-wrap items-center gap-2">
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.22em] text-sidebar-foreground/60">
+          Actions
+        </span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-sidebar-foreground/40">
+          {saving ? "saving…" : ""}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1">
         <ToggleButton
           active={isStarred}
           onClick={() => patch({ starred: !isStarred }, "star")}
@@ -66,16 +74,12 @@ export function InteractionPanel({ articleId, initialInteraction }: InteractionP
           glyph="◐"
           label="Follow up"
         />
-        <span className="ml-auto font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-          {saving ? "saving…" : ""}
-        </span>
       </div>
 
-      {/* Notes textarea */}
-      <div className="mt-4">
+      <div className="mt-2">
         <label
           htmlFor="interaction-note"
-          className="mb-1.5 block font-mono text-[9.5px] font-medium uppercase tracking-[0.22em] text-muted-foreground"
+          className="mb-1.5 block font-mono text-[9.5px] font-medium uppercase tracking-[0.22em] text-sidebar-foreground/60"
         >
           Notes
         </label>
@@ -85,7 +89,7 @@ export function InteractionPanel({ articleId, initialInteraction }: InteractionP
           onChange={(e) => setNoteDraft(e.target.value)}
           onBlur={handleNoteBlur}
           placeholder="Personal notes — save on blur"
-          className="block min-h-[80px] w-full resize-y border border-border bg-background/40 px-3 py-2 font-display text-[14px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none"
+          className="block min-h-[140px] w-full resize-y rounded-sm border border-sidebar-border bg-transparent px-2 py-1.5 text-[12px] leading-relaxed text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus:border-sidebar-ring focus:outline-none"
         />
       </div>
     </section>
@@ -108,14 +112,14 @@ function ToggleButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors",
+        "inline-flex items-center gap-2 rounded-sm border px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-[0.16em] transition-colors",
         active
-          ? "border-primary bg-primary/10 text-primary shadow-[inset_2px_0_0_0_theme(colors.primary)] pl-[13px]"
-          : "border-border text-muted-foreground hover:border-border/80 hover:text-foreground",
+          ? "border-sidebar-primary/60 bg-sidebar-primary/10 text-sidebar-primary"
+          : "border-sidebar-border text-sidebar-foreground/70 hover:text-sidebar-foreground",
       )}
     >
-      <span className="text-[13px] leading-none">{glyph}</span>
-      {label}
+      <span className="text-[12px] leading-none">{glyph}</span>
+      <span className="flex-1">{label}</span>
     </button>
   );
 }

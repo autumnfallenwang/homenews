@@ -14,6 +14,7 @@ import { llm } from "./llm-client.js";
 import { getSetting } from "./settings.js";
 
 const EMBEDDING_MODEL_SETTING = "embedding_model_name";
+const EMBEDDING_FALLBACK_SETTING = "embedding_model_name_fallback";
 const DEFAULT_MODEL = "bge-m3:latest";
 
 async function getModel(): Promise<string> {
@@ -26,16 +27,49 @@ async function getModel(): Promise<string> {
   }
 }
 
+async function getFallbackModel(): Promise<string | null> {
+  try {
+    const v = await getSetting<string>(EMBEDDING_FALLBACK_SETTING);
+    return v && v.length > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+async function callEmbed(model: string, input: string | string[]): Promise<number[][]> {
+  const response = await llm.embeddings.create({ model, input });
+  // OpenAI guarantees response.data is in the same order as the input
+  // array, but sort by index for defensive safety.
+  const sorted = [...response.data].sort((a, b) => a.index - b.index);
+  const vectors = sorted.map((d) => d.embedding);
+  return vectors;
+}
+
 export async function embed(text: string): Promise<number[]> {
-  const model = await getModel();
+  const primary = await getModel();
+  const fallback = await getFallbackModel();
   const startedAt = Date.now();
 
+  let model = primary;
   try {
-    const response = await llm.embeddings.create({
-      model,
-      input: text,
-    });
-    const vector = response.data[0]?.embedding;
+    let vectors: number[][];
+    try {
+      vectors = await callEmbed(primary, text);
+    } catch (err) {
+      if (!fallback || fallback === primary) throw err;
+      log.warn(
+        {
+          event: "embed.fallback.used",
+          primary_model: primary,
+          fallback_model: fallback,
+          err: err instanceof Error ? err : new Error(String(err)),
+        },
+        "primary embedding failed, retrying with fallback model",
+      );
+      model = fallback;
+      vectors = await callEmbed(fallback, text);
+    }
+    const vector = vectors[0];
     if (!vector) {
       throw new Error("embeddings.create returned no data");
     }
@@ -67,19 +101,31 @@ export async function embed(text: string): Promise<number[]> {
 
 export async function embedBatch(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
-  const model = await getModel();
+  const primary = await getModel();
+  const fallback = await getFallbackModel();
   const startedAt = Date.now();
   const totalChars = texts.reduce((sum, t) => sum + t.length, 0);
 
+  let model = primary;
   try {
-    const response = await llm.embeddings.create({
-      model,
-      input: texts,
-    });
-    // OpenAI guarantees response.data is in the same order as the input
-    // array, but sort by index for defensive safety.
-    const sorted = [...response.data].sort((a, b) => a.index - b.index);
-    const vectors = sorted.map((d) => d.embedding);
+    let vectors: number[][];
+    try {
+      vectors = await callEmbed(primary, texts);
+    } catch (err) {
+      if (!fallback || fallback === primary) throw err;
+      log.warn(
+        {
+          event: "embed.batch.fallback.used",
+          primary_model: primary,
+          fallback_model: fallback,
+          batch_size: texts.length,
+          err: err instanceof Error ? err : new Error(String(err)),
+        },
+        "primary embedding batch failed, retrying with fallback model",
+      );
+      model = fallback;
+      vectors = await callEmbed(fallback, texts);
+    }
     if (vectors.length !== texts.length) {
       throw new Error(`embedBatch: got ${vectors.length} vectors for ${texts.length} inputs`);
     }

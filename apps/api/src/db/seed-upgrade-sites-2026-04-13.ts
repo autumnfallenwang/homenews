@@ -55,7 +55,13 @@ async function run() {
       .returning({ id: feeds.id, name: feeds.name });
     if (updated.length > 0) {
       log.info(
-        { event: "migration.feed.updated", script: SCRIPT, from: u.name, to: u.newName, url: u.url },
+        {
+          event: "migration.feed.updated",
+          script: SCRIPT,
+          from: u.name,
+          to: u.newName,
+          url: u.url,
+        },
         "feed renamed + URL updated",
       );
     } else {

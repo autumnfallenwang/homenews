@@ -1,32 +1,17 @@
 "use client";
 
 import type { Feed } from "@homenews/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { fetchFeeds, updateFeed } from "@/lib/api";
-import { type FeedEdit, FeedList } from "./feed-list";
+import { FeedList } from "./feed-list";
 
-export interface FeedsSectionActions {
-  save: () => Promise<void>;
-  cancel: () => void;
-}
+// FeedsSection — auto-save model. Each toggle / weight edit commits to the
+// server immediately; there's no save-bar gate anymore. State is the live
+// `feeds` array; on a row edit we optimistically update, POST, and revert
+// on failure.
 
-export function FeedsSection({
-  actionsRef,
-  onDirtyChange,
-}: {
-  actionsRef: React.MutableRefObject<FeedsSectionActions | null>;
-  onDirtyChange: (dirty: boolean) => void;
-}) {
+export function FeedsSection() {
   const [feeds, setFeeds] = useState<Feed[] | null>(null);
-  const [pendingEdits, setPendingEdits] = useState<Record<string, FeedEdit>>({});
-
-  // Snapshot the latest pendingEdits + feeds in refs so the actions object
-  // exposed to the parent always has up-to-date closures without having to
-  // re-register on every keystroke.
-  const pendingRef = useRef(pendingEdits);
-  const feedsRef = useRef(feeds);
-  pendingRef.current = pendingEdits;
-  feedsRef.current = feeds;
 
   useEffect(() => {
     fetchFeeds()
@@ -34,29 +19,20 @@ export function FeedsSection({
       .catch(() => setFeeds([]));
   }, []);
 
-  const dirty = Object.keys(pendingEdits).length > 0;
-  useEffect(() => {
-    onDirtyChange(dirty);
-  }, [dirty, onDirtyChange]);
-
-  useEffect(() => {
-    actionsRef.current = {
-      save: async () => {
-        const edits = pendingRef.current;
-        const ids = Object.keys(edits);
-        if (ids.length === 0) return;
-        for (const id of ids) {
-          const updated = await updateFeed(id, edits[id]);
-          setFeeds((prev) => (prev ? prev.map((f) => (f.id === id ? updated : f)) : prev));
-        }
-        setPendingEdits({});
-      },
-      cancel: () => setPendingEdits({}),
-    };
-    return () => {
-      actionsRef.current = null;
-    };
-  }, [actionsRef]);
+  async function commitFeed(feedId: string, patch: Partial<Feed>) {
+    const prev = feeds;
+    if (!prev) return;
+    const before = prev.find((f) => f.id === feedId);
+    if (!before) return;
+    setFeeds(prev.map((f) => (f.id === feedId ? { ...f, ...patch } : f)));
+    try {
+      const updated = await updateFeed(feedId, patch);
+      setFeeds((s) => (s ? s.map((f) => (f.id === feedId ? updated : f)) : s));
+    } catch (err) {
+      console.error(`Save feed ${feedId} failed:`, err);
+      setFeeds((s) => (s ? s.map((f) => (f.id === feedId ? before : f)) : s));
+    }
+  }
 
   if (feeds === null) {
     return (
@@ -66,12 +42,5 @@ export function FeedsSection({
     );
   }
 
-  return (
-    <FeedList
-      feeds={feeds}
-      setFeeds={setFeeds}
-      pendingEdits={pendingEdits}
-      setPendingEdits={setPendingEdits}
-    />
-  );
+  return <FeedList feeds={feeds} setFeeds={setFeeds} onCommit={commitFeed} />;
 }

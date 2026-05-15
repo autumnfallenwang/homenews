@@ -22,51 +22,47 @@ function scoreColor(score: number): string {
 export function ArticleRow({ item }: { item: AnalyzedArticle }) {
   const composite = Math.round(Number(item.compositeScore) * 100);
   return (
-    <article className="group relative border-b border-border py-6 transition-colors hover:bg-card/30">
-      <div className="px-1">
-        <div className="mb-2 flex items-center justify-between gap-4">
-          <div className="flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            <span className="text-foreground/80">{item.article.feedName}</span>
-            <span className="text-muted-foreground/50">·</span>
-            <span>{formatRelativeTime(item.article.publishedAt)}</span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/60">
-              score
-            </span>
-            <span
-              className={cn("tabular font-mono text-[15px] font-medium", scoreColor(composite))}
-            >
-              {composite}
-            </span>
-          </div>
+    <article className="group relative border-b border-border py-7">
+      <div className="mb-2 flex items-center justify-between gap-4">
+        <div className="flex items-baseline gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="text-foreground/80">{item.article.feedName}</span>
+          <span className="text-muted-foreground/40">·</span>
+          <span>{formatRelativeTime(item.article.publishedAt)}</span>
         </div>
-
-        <h3 className="font-display text-[22px] font-medium leading-[1.2] tracking-tight text-foreground transition-colors group-hover:text-primary">
-          <Link href={`/article/${item.id}`} className="block">
-            {item.article.title}
-          </Link>
-        </h3>
-
-        {(item.llmSummary || item.article.summary) && (
-          <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-muted-foreground">
-            {item.llmSummary ?? item.article.summary}
-          </p>
-        )}
-
-        {item.tags && item.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {item.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-sm border border-border bg-card/40 px-1.5 py-0.5 font-mono text-[10px] lowercase tracking-wide text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+        <span
+          className={cn(
+            "tabular font-mono text-[15px] font-medium tabular-nums",
+            scoreColor(composite),
+          )}
+        >
+          {composite}
+        </span>
       </div>
+
+      <h3 className="font-display text-[22px] font-medium leading-[1.2] tracking-tight text-foreground transition-colors group-hover:text-primary">
+        <Link href={`/article/${item.id}`} className="block">
+          {item.article.title}
+        </Link>
+      </h3>
+
+      {(item.llmSummary || item.article.summary) && (
+        <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-muted-foreground">
+          {item.llmSummary ?? item.article.summary}
+        </p>
+      )}
+
+      {item.tags && item.tags.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {item.tags.map((tag) => (
+            <span
+              key={tag}
+              className="font-mono text-[10px] lowercase tracking-[0.12em] text-muted-foreground/70"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
     </article>
   );
 }

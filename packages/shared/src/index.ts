@@ -596,7 +596,7 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
     description: "Primary LLM model for analyze task (classification: relevance, importance, tags)",
   },
   llm_model_analyze_fallback: {
-    value: "gemma3:27b",
+    value: "gemma4:26b",
     type: "string",
     description: "Fallback LLM model for analyze task if primary fails",
   },
@@ -606,7 +606,7 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
     description: "Primary LLM model for summarize task (text generation)",
   },
   llm_model_summarize_fallback: {
-    value: "gemma3:27b",
+    value: "gemma4:26b",
     type: "string",
     description: "Fallback LLM model for summarize task if primary fails",
   },
@@ -617,6 +617,12 @@ export const DEFAULT_SETTINGS: Record<string, DefaultSetting> = {
     type: "string",
     description:
       "Embedding model for semantic search. Changing this requires re-embedding existing content via the backfill job — dimensions must match the vector(1024) column.",
+  },
+  embedding_model_name_fallback: {
+    value: "qwen3-embedding:0.6b",
+    type: "string",
+    description:
+      "Fallback embedding model if primary fails. Must produce the same dimensions as the primary (vector(1024) column).",
   },
 
   // UI theme

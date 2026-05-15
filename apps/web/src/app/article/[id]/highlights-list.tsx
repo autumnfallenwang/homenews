@@ -53,12 +53,9 @@ export function HighlightsList({ highlights }: HighlightsListProps) {
           Select any passage above to save a highlight.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col">
           {highlights.map((h) => (
-            <li
-              key={h.id}
-              className="group border border-border bg-card/30 px-4 py-3 transition-colors"
-            >
+            <li key={h.id} className="group border-b border-border py-4 last:border-b-0">
               <blockquote className="border-l-2 border-primary/60 pl-4 font-display text-[15px] italic leading-relaxed text-foreground">
                 “{h.text}”
               </blockquote>
