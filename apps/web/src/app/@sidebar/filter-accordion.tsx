@@ -417,24 +417,28 @@ function ChipSection({
             const active = selected.includes(item);
             const count = counts?.get(item);
             return (
-              <button
+              <label
                 key={item}
-                type="button"
-                onClick={() => onToggle(item)}
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-sm px-2 py-1 text-left text-[12px] transition-colors",
+                  "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-[12px] transition-colors",
                   active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    ? "text-sidebar-foreground"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50",
                 )}
               >
-                <span className="truncate">{item}</span>
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={() => onToggle(item)}
+                  className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-primary"
+                />
+                <span className="flex-1 truncate">{item}</span>
                 {count !== undefined && (
                   <span className="font-mono text-[10px] tabular-nums text-sidebar-foreground/50">
                     {count}
                   </span>
                 )}
-              </button>
+              </label>
             );
           })
         )}
@@ -454,8 +458,18 @@ function AccordionSection({
   activeCount: number;
   children: React.ReactNode;
 }) {
+  // Controlled open state. `defaultOpen` derives from URL filters and can
+  // change between renders (e.g. when the user adds a Source); Base UI's
+  // uncontrolled Collapsible warns when its `defaultOpen` shifts after
+  // mount. Owning the state here lets us auto-expand when a filter becomes
+  // active while still letting the user collapse it manually.
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
+
   return (
-    <Collapsible defaultOpen={defaultOpen} className="group/section">
+    <Collapsible open={open} onOpenChange={setOpen} className="group/section">
       <SidebarGroup className="py-0">
         <SidebarGroupLabel
           className="cursor-pointer"

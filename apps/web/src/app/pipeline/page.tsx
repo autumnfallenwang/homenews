@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { PipelineControl } from "../pipeline-control";
 
 // Phase 18 Task 122 — pipeline gets its own top-level route. Previously
@@ -17,21 +18,15 @@ import { PipelineControl } from "../pipeline-control";
 // injection mechanism is built (Task 123 sets it up for filters).
 
 export default function PipelinePage() {
+  // Status indicator + Run-now button live inside PipelineControl (it owns
+  // the SSE stream + status polling). The slim header here is title-only so
+  // the section keeps a single source of truth for active-run state.
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-10">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          Pipeline
-        </span>
-        <h1 className="mt-3 font-display text-[2.75rem] leading-[1.05] tracking-tight text-foreground">
-          Run trace and history.
-        </h1>
-        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
-          Watch the current run unfold phase-by-phase, or step back through past runs to inspect
-          counts, durations, and any failures.
-        </p>
-      </header>
-      <PipelineControl />
-    </main>
+    <>
+      <PageHeader title="Pipeline" status="Run trace and history" />
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <PipelineControl />
+      </main>
+    </>
   );
 }

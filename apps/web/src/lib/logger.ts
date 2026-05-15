@@ -13,10 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pino } from "pino";
 
-const pkgPath = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../package.json",
-);
+const pkgPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../package.json");
 const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
   name: string;
   version: string;

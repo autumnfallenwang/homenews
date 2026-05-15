@@ -25,12 +25,6 @@ import {
 } from "@/components/ui/table";
 import { createFeed, deleteFeed, triggerFetchFeed } from "@/lib/api";
 
-export interface FeedEdit {
-  enabled?: boolean;
-  authorityScore?: number;
-  analyzeWeight?: number;
-}
-
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "Never";
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -44,11 +38,10 @@ function formatDate(dateStr: string | null): string {
 interface FeedListProps {
   feeds: Feed[];
   setFeeds: React.Dispatch<React.SetStateAction<Feed[] | null>>;
-  pendingEdits: Record<string, FeedEdit>;
-  setPendingEdits: React.Dispatch<React.SetStateAction<Record<string, FeedEdit>>>;
+  onCommit: (feedId: string, patch: Partial<Feed>) => void;
 }
 
-export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: FeedListProps) {
+export function FeedList({ feeds, setFeeds, onCommit }: FeedListProps) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
@@ -56,68 +49,12 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
   const [category, setCategory] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
-  function effectiveEnabled(feed: Feed): boolean {
-    return pendingEdits[feed.id]?.enabled ?? feed.enabled;
-  }
-
-  function effectiveAuthority(feed: Feed): number {
-    return pendingEdits[feed.id]?.authorityScore ?? feed.authorityScore;
-  }
-
-  function effectiveAnalyzeWeight(feed: Feed): number {
-    return pendingEdits[feed.id]?.analyzeWeight ?? feed.analyzeWeight;
-  }
-
-  function setEdit(feedId: string, patch: FeedEdit, savedFeed: Feed) {
-    setPendingEdits((prev) => {
-      const existing: FeedEdit = prev[feedId] ?? {};
-      const candidateEnabled = patch.enabled ?? existing.enabled;
-      const candidateAuthority = patch.authorityScore ?? existing.authorityScore;
-      const candidateAnalyzeWeight = patch.analyzeWeight ?? existing.analyzeWeight;
-
-      const cleaned: FeedEdit = {};
-      if (candidateEnabled !== undefined && candidateEnabled !== savedFeed.enabled) {
-        cleaned.enabled = candidateEnabled;
-      }
-      if (candidateAuthority !== undefined && candidateAuthority !== savedFeed.authorityScore) {
-        cleaned.authorityScore = candidateAuthority;
-      }
-      if (
-        candidateAnalyzeWeight !== undefined &&
-        candidateAnalyzeWeight !== savedFeed.analyzeWeight
-      ) {
-        cleaned.analyzeWeight = candidateAnalyzeWeight;
-      }
-
-      const { [feedId]: _drop, ...rest } = prev;
-      if (Object.keys(cleaned).length === 0) return rest;
-      return { ...rest, [feedId]: cleaned };
-    });
-  }
-
-  function handleToggle(feed: Feed) {
-    setEdit(feed.id, { enabled: !effectiveEnabled(feed) }, feed);
-  }
-
-  function handleAuthorityChange(feed: Feed, value: number) {
-    setEdit(feed.id, { authorityScore: value }, feed);
-  }
-
-  function handleAnalyzeWeightChange(feed: Feed, value: number) {
-    setEdit(feed.id, { analyzeWeight: value }, feed);
-  }
-
   async function handleDelete(feed: Feed) {
     if (!window.confirm(`Delete "${feed.name}" and all its articles?`)) return;
     setBusy(feed.id);
     try {
       await deleteFeed(feed.id);
       setFeeds((prev) => (prev ? prev.filter((f) => f.id !== feed.id) : prev));
-      setPendingEdits((prev) => {
-        if (!(feed.id in prev)) return prev;
-        const { [feed.id]: _drop, ...rest } = prev;
-        return rest;
-      });
     } catch (err) {
       console.error("Delete failed:", err);
     } finally {
@@ -234,21 +171,11 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
           </TableHeader>
           <TableBody>
             {feeds.map((feed) => {
-              const isPending = feed.id in pendingEdits;
               return (
                 <TableRow key={feed.id}>
                   <TableCell>
                     <div>
-                      <div className="flex items-center gap-2 font-medium">
-                        {feed.name}
-                        {isPending && (
-                          <span
-                            className="h-1.5 w-1.5 rounded-full bg-primary"
-                            title="Unsaved changes"
-                            aria-hidden
-                          />
-                        )}
-                      </div>
+                      <div className="font-medium">{feed.name}</div>
                       <div className="max-w-xs truncate text-xs text-muted-foreground">
                         {feed.url}
                       </div>
@@ -257,22 +184,22 @@ export function FeedList({ feeds, setFeeds, pendingEdits, setPendingEdits }: Fee
                   <TableCell className="text-muted-foreground">{feed.category ?? "—"}</TableCell>
                   <TableCell>
                     <Switch
-                      checked={effectiveEnabled(feed)}
-                      onCheckedChange={() => handleToggle(feed)}
+                      checked={feed.enabled}
+                      onCheckedChange={(v) => onCommit(feed.id, { enabled: v })}
                     />
                   </TableCell>
                   <TableCell>
                     <WeightInput
                       id={`authority-${feed.id}`}
-                      value={effectiveAuthority(feed)}
-                      onChange={(v) => handleAuthorityChange(feed, v)}
+                      value={feed.authorityScore}
+                      onChange={(v) => onCommit(feed.id, { authorityScore: v })}
                     />
                   </TableCell>
                   <TableCell>
                     <WeightInput
                       id={`analyze-weight-${feed.id}`}
-                      value={effectiveAnalyzeWeight(feed)}
-                      onChange={(v) => handleAnalyzeWeightChange(feed, v)}
+                      value={feed.analyzeWeight}
+                      onChange={(v) => onCommit(feed.id, { analyzeWeight: v })}
                     />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">

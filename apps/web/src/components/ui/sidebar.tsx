@@ -3,7 +3,7 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
-import { PanelLeftIcon } from "lucide-react";
+import { MenuIcon, PanelLeftIcon } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,8 +21,11 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
+const SIDEBAR_WIDTH_COOKIE_NAME = "sidebar_width";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = "16rem";
+const SIDEBAR_WIDTH_DEFAULT_PX = 256; // 16rem
+const SIDEBAR_WIDTH_MIN_PX = 200;
+const SIDEBAR_WIDTH_MAX_PX = 480;
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
@@ -35,6 +38,8 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  widthPx: number;
+  setWidthPx: (width: number) => void;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -101,6 +106,28 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 
+  // Resizable width — clamped to [MIN, MAX] px. Persisted to a cookie so a
+  // page reload keeps the column at the user's last drag. SSR uses the
+  // default; client mount reads the cookie and corrects on first paint.
+  const [widthPx, setWidthPxState] = React.useState<number>(SIDEBAR_WIDTH_DEFAULT_PX);
+  React.useEffect(() => {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${SIDEBAR_WIDTH_COOKIE_NAME}=(\\d+)`));
+    if (match) {
+      const parsed = Number.parseInt(match[1], 10);
+      if (Number.isFinite(parsed)) {
+        setWidthPxState(Math.max(SIDEBAR_WIDTH_MIN_PX, Math.min(SIDEBAR_WIDTH_MAX_PX, parsed)));
+      }
+    }
+  }, []);
+  const setWidthPx = React.useCallback((next: number) => {
+    const clamped = Math.max(
+      SIDEBAR_WIDTH_MIN_PX,
+      Math.min(SIDEBAR_WIDTH_MAX_PX, Math.round(next)),
+    );
+    setWidthPxState(clamped);
+    document.cookie = `${SIDEBAR_WIDTH_COOKIE_NAME}=${clamped}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  }, []);
+
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed";
@@ -114,8 +141,10 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      widthPx,
+      setWidthPx,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, widthPx, setWidthPx],
   );
 
   return (
@@ -124,7 +153,7 @@ function SidebarProvider({
         data-slot="sidebar-wrapper"
         style={
           {
-            "--sidebar-width": SIDEBAR_WIDTH,
+            "--sidebar-width": `${widthPx}px`,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties
@@ -243,6 +272,28 @@ function Sidebar({
   );
 }
 
+// Compact open-trigger shown in the page header. Only renders when the
+// sidebar is fully collapsed (offcanvas mode), so the toolbar isn't
+// permanently cluttered while the rail is visible.
+function SidebarOpenTrigger({ className }: { className?: string }) {
+  const { open, isMobile, openMobile, setOpenMobile, setOpen } = useSidebar();
+  const isCollapsed = isMobile ? !openMobile : !open;
+  if (!isCollapsed) return null;
+  return (
+    <button
+      type="button"
+      aria-label="Open sidebar"
+      onClick={() => (isMobile ? setOpenMobile(true) : setOpen(true))}
+      className={cn(
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground",
+        className,
+      )}
+    >
+      <MenuIcon className="h-4 w-4" />
+    </button>
+  );
+}
+
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar();
 
@@ -266,20 +317,66 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
 }
 
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, widthPx, setWidthPx, open } = useSidebar();
+  // Combined drag-to-resize + click-to-toggle. We arm a drag on mousedown
+  // and only commit it if the pointer actually moves past a small threshold
+  // (DRAG_THRESHOLD_PX). Otherwise the mouseup is treated as a click and
+  // calls toggleSidebar(). This lets the same hairline serve both gestures
+  // without a separate handle.
+  const dragRef = React.useRef<{
+    startX: number;
+    startWidth: number;
+    moved: boolean;
+  } | null>(null);
+  const DRAG_THRESHOLD_PX = 3;
+
+  const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    // Only resize when the sidebar is open — when collapsed (offcanvas), the
+    // rail is a click-to-open handle, not a resize handle.
+    if (!open) return;
+    dragRef.current = { startX: e.clientX, startWidth: widthPx, moved: false };
+    (e.target as HTMLButtonElement).setPointerCapture(e.pointerId);
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const delta = e.clientX - drag.startX;
+    if (!drag.moved && Math.abs(delta) < DRAG_THRESHOLD_PX) return;
+    drag.moved = true;
+    setWidthPx(drag.startWidth + delta);
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    (e.target as HTMLButtonElement).releasePointerCapture?.(e.pointerId);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    dragRef.current = null;
+    // No movement → treat as a click and toggle the sidebar.
+    if (!drag?.moved) {
+      toggleSidebar();
+    }
+  };
 
   return (
     <button
+      type="button"
       data-sidebar="rail"
       data-slot="sidebar-rail"
-      aria-label="Toggle Sidebar"
+      aria-label={open ? "Resize or collapse sidebar" : "Open sidebar"}
       tabIndex={-1}
-      onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      title={open ? "Drag to resize · Click to collapse" : "Click to open"}
       className={cn(
-        "absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
-        "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
-        "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
+        "absolute inset-y-0 z-20 hidden w-4 transition-colors ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
+        "group-data-[state=expanded]:cursor-ew-resize",
+        "group-data-[state=collapsed]:cursor-e-resize",
         "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar",
         "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
         "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
@@ -683,6 +780,7 @@ export {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarOpenTrigger,
   SidebarProvider,
   SidebarRail,
   SidebarSeparator,

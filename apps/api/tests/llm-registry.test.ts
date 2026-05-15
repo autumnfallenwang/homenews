@@ -104,9 +104,9 @@ describe("getModelForTask", () => {
 
 describe("getFallbackModelForTask", () => {
   it("reads llm_model_analyze_fallback setting", async () => {
-    getSettingMock.mockResolvedValueOnce("gemma3:27b");
+    getSettingMock.mockResolvedValueOnce("gemma4:26b");
     const model = await getFallbackModelForTask("analyze");
-    expect(model).toBe("gemma3:27b");
+    expect(model).toBe("gemma4:26b");
     expect(getSettingMock).toHaveBeenCalledWith("llm_model_analyze_fallback");
   });
 

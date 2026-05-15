@@ -15,9 +15,5 @@ export default async function SettingsPage({
     // API unavailable — show empty state, form falls back to defaults
   }
 
-  return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <SettingsForm initialSettings={settings} initialTab={tab ?? "scoring"} />
-    </main>
-  );
+  return <SettingsForm initialSettings={settings} initialTab={tab ?? "scoring"} />;
 }

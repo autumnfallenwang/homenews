@@ -88,10 +88,7 @@ export function startScheduler(cronExpression: string = DEFAULT_SCHEDULE): Sched
     name: "feed-fetcher",
   });
 
-  log.info(
-    { event: "scheduler.started", cron: cronExpression },
-    "scheduler started",
-  );
+  log.info({ event: "scheduler.started", cron: cronExpression }, "scheduler started");
   return task;
 }
 

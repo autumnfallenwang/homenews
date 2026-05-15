@@ -12,10 +12,8 @@ import { cn } from "@/lib/utils";
 // source of truth for which tab keys exist + their dirty state.
 const TABS: { id: string; label: string }[] = [
   { id: "scoring", label: "Scoring" },
-  { id: "freshness", label: "Freshness" },
   { id: "scheduler", label: "Scheduler" },
   { id: "models", label: "LLM Models" },
-  { id: "tags", label: "Tag Vocabulary" },
   { id: "theme", label: "Theme" },
   { id: "feeds", label: "Feeds" },
 ];

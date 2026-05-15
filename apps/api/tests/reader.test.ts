@@ -167,9 +167,7 @@ describe("extractArticle", () => {
     const spy = vi.fn();
     globalThis.fetch = spy;
 
-    const result = await extractArticle(
-      "https://news.google.com/rss/articles/CBMiAA?oc=5",
-    );
+    const result = await extractArticle("https://news.google.com/rss/articles/CBMiAA?oc=5");
 
     expect(spy).not.toHaveBeenCalled();
     expect(result.ok).toBe(false);

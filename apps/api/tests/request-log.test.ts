@@ -48,9 +48,7 @@ describe("requestLog middleware", () => {
     expect(fields.status).toBe(200);
     expect(typeof fields.latency_ms).toBe("number");
     expect(fields.latency_ms).toBeGreaterThanOrEqual(0);
-    expect(fields.req_id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    expect(fields.req_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   });
 
   it("attaches req_id to the Hono context so handlers can read it", async () => {

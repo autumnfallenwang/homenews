@@ -19,8 +19,9 @@ component choice, file paths, and migration steps land in a follow-up.
 
 ## The shell
 
-One sidebar. One main content area. No global header. The sidebar's contents
-swap by route — there is never a secondary side column.
+One sidebar. One main content area. A **slim page header** at the top of the
+main area (see "Page header" below). The sidebar's contents swap by route —
+there is never a secondary side column.
 
 The sidebar has **two shapes**, depending on what route is active:
 
@@ -30,8 +31,8 @@ The sidebar has **two shapes**, depending on what route is active:
 
 ```
 ┌──────────────────────┬────────────────────────────────────────────────┐
-│ HOMENEWS             │                                                │
-│                      │                                                │
+│ HOMENEWS             │ Dashboard · 50 of 1,234 · Avg 73%        [⟳]   │
+│                      │ ──────────────────────────────────────────────│
 │ ◐ Dashboard          │                                                │
 │ ⌕ Search             │                                                │
 │ ☆ Highlights         │                                                │
@@ -73,8 +74,8 @@ Three zones, top to bottom:
 
 ```
 ┌──────────────────────┬────────────────────────────────────────────────┐
-│ ← Back               │                                                │
-│                      │                                                │
+│ ← Back               │ Settings · Scoring                  Saved      │
+│                      │ ──────────────────────────────────────────────│
 │ Scoring              │                                                │
 │ Freshness            │                                                │
 │ Scheduler            │                                                │
@@ -125,6 +126,60 @@ inline chrome they share with the dashboard.
 
 Switching between top-level tabs is one click. Returning from a sub-page to a
 top-level tab is one click (`Back`) plus optionally a second to switch tabs.
+
+## Page header
+
+A slim, sticky bar at the top of the main content area on every page. It is
+**not a global header** — it lives inside the main panel (the sidebar
+extends above it), and its content is page-specific. It exists so the user
+always knows "where am I" and "what is the status," and so the most-used
+quick-control action is one click away without scrolling.
+
+```
+┌──────────────┬─────────────────────────────────────────────────────────────┐
+│  sidebar     │  Dashboard   ·   50 of 1,234 articles   ·   Avg 73%    [⟳]  │
+│              │ ─────────────────────────────────────────────────────────── │
+│              │                                                             │
+│              │   (page content scrolls here, header stays pinned)          │
+│              │                                                             │
+└──────────────┴─────────────────────────────────────────────────────────────┘
+```
+
+Three slots, left → right:
+
+1. **Title** — the page name. Where you are. Plain text, mono small-caps or
+   sans depending on type pass. Never a long sentence.
+2. **Status indicator** — a short, glanceable phrase or chips telling you
+   *what the page is currently showing*: counts, last-update timestamp, run
+   status, save state. Read-only. No expandable popovers; if a piece of
+   status needs to be drilled into, the drill lives on the page itself.
+3. **Quick-control buttons** — at most 1–2 essential actions, icon-only or
+   icon+label. Things like "refresh", "run now". **Anything complex
+   belongs in the sidebar's contextual zone, not here.** This bar must not
+   grow folded panels or dropdowns over time.
+
+Strict rules:
+- No expandable / folded panels. No drawers triggered from this bar.
+- No filter controls — filters stay in the sidebar contextual zone (Shape A
+  dashboard's filter accordion is the canonical home).
+- One row of height. Never two rows of chrome.
+- Sticky on scroll so the title and status stay visible while reading down
+  a long feed.
+
+### Per-page contents
+
+| Page | Title | Status indicator | Quick-control buttons |
+|---|---|---|---|
+| `/` (dashboard) | `Dashboard` | `<shown> of <total> articles · Avg <score>` | Refresh |
+| `/search` | `Search` | `<n> results for "<q>"` (when q present) | — |
+| `/highlights` | `Highlights` | `<n> highlights · <m> articles` | — |
+| `/pipeline` | `Pipeline` | Last run status + age (e.g. `Last run: 4m ago · ok`) | Run now |
+| `/settings` | Current section name (e.g. `Settings · Scoring`) | Auto-save status (`Auto-save on change` / `Saved` flash / error) | — |
+| `/article/[id]` | Article title (truncated) | Source · published time · composite score | Open original |
+
+Status indicators are placeholders today and refine as each page evolves —
+the constraint is the *shape* (short, glanceable, one row), not the exact
+copy.
 
 ## Visual language
 

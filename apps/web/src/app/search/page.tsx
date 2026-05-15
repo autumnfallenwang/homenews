@@ -9,6 +9,7 @@ import {
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PageHeader } from "@/components/page-header";
 import { fetchSearch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { SearchControls } from "./search-controls";
@@ -100,80 +101,88 @@ export default async function SearchPage({
     }
   }
 
+  const status = buildSearchStatus(q, results);
+
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      {/* Phase 18 Task 127: the inline "Back to briefing" link is gone —
-          AppSidebar's primary nav carries cross-page navigation now. */}
-      <header className="mb-10">
-        <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          Your knowledge base
-        </div>
-        <h1 className="font-display text-[2.5rem] font-medium leading-[1.05] tracking-tight text-foreground">
-          <span className="italic text-primary">Search.</span>
-        </h1>
-        <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-          Four modes — <span className="text-foreground">hybrid</span> combines keyword + semantic,{" "}
-          <span className="text-foreground">keyword</span> matches exact phrases,{" "}
-          <span className="text-foreground">fuzzy</span> tolerates typos,{" "}
-          <span className="text-foreground">semantic</span> finds related ideas. Searches span
-          articles and highlights across your entire corpus.
-        </p>
-      </header>
+    <>
+      <PageHeader title="Search" status={status} />
+      <main className="mx-auto max-w-3xl px-6 py-8">
+        <SearchControls initialQ={q} initialMode={mode} initialTarget={target} />
 
-      <SearchControls initialQ={q} initialMode={mode} initialTarget={target} />
-
-      {q && error && (
-        <div className="border border-destructive/50 bg-destructive/10 px-5 py-4 font-mono text-[11px] uppercase tracking-[0.14em] text-destructive">
-          Search failed: {error}
-        </div>
-      )}
-
-      {q && results && results.rows.length === 0 && (
-        <div className="border-y border-border py-16 text-center">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            No results for "{q}"
-          </p>
-          <p className="mt-2 font-display text-[13px] italic text-muted-foreground/70">
-            Try a different mode or broaden the query.
-          </p>
-        </div>
-      )}
-
-      {q && results && results.rows.length > 0 && (
-        <>
-          <div className="mb-5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            <span className="text-primary">{results.rows.length}</span> result
-            {results.rows.length === 1 ? "" : "s"} · mode: {results.mode}
+        {q && error && (
+          <div className="border border-destructive/50 bg-destructive/10 px-5 py-4 font-mono text-[11px] uppercase tracking-[0.14em] text-destructive">
+            Search failed: {error}
           </div>
-          <ul className="flex flex-col gap-4">
-            {results.rows.map((row) => (
-              <li
-                key={
-                  row.kind === "article" ? `a-${row.article.articleId}` : `h-${row.highlight.id}`
-                }
-              >
-                {row.kind === "article" ? (
-                  <ArticleResultCard row={row} />
-                ) : (
-                  <HighlightResultCard row={row} />
-                )}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+        )}
 
-      {!q && (
-        <div className="border-y border-border py-16 text-center">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            Type a query and press Enter
-          </p>
-          <p className="mt-2 font-display text-[13px] italic text-muted-foreground/70">
-            Search across articles and highlights you've captured.
-          </p>
-        </div>
-      )}
-    </main>
+        {q && results && results.rows.length === 0 && (
+          <div className="border-y border-border py-16 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+              No results for "{q}"
+            </p>
+            <p className="mt-2 font-display text-[13px] italic text-muted-foreground/70">
+              Try a different mode or broaden the query.
+            </p>
+          </div>
+        )}
+
+        {q && results && results.rows.length > 0 && (
+          <>
+            <div className="mb-5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="text-primary">{results.rows.length}</span> result
+              {results.rows.length === 1 ? "" : "s"} · mode: {results.mode}
+            </div>
+            <ul className="flex flex-col gap-4">
+              {results.rows.map((row) => (
+                <li
+                  key={
+                    row.kind === "article" ? `a-${row.article.articleId}` : `h-${row.highlight.id}`
+                  }
+                >
+                  {row.kind === "article" ? (
+                    <ArticleResultCard row={row} />
+                  ) : (
+                    <HighlightResultCard row={row} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {!q && (
+          <div className="border-y border-border py-16 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+              Type a query and press Enter
+            </p>
+            <p className="mt-2 font-display text-[13px] italic text-muted-foreground/70">
+              Search across articles and highlights you've captured.
+            </p>
+          </div>
+        )}
+      </main>
+    </>
+  );
+}
+
+function buildSearchStatus(q: string, results: SearchResponse | null): ReactNode {
+  if (!q) {
+    return <span className="text-muted-foreground/70">Type to search</span>;
+  }
+  if (!results) {
+    return <span className="text-muted-foreground/70">Searching…</span>;
+  }
+  return (
+    <span>
+      <span className="text-foreground">{results.rows.length}</span>
+      <span className="text-muted-foreground/60">
+        {" "}
+        result{results.rows.length === 1 ? "" : "s"} for{" "}
+      </span>
+      <span className="text-foreground">"{q}"</span>
+      <span className="text-muted-foreground/60"> · mode </span>
+      <span className="text-foreground">{results.mode}</span>
+    </span>
   );
 }
 

@@ -14,7 +14,15 @@
 //
 // See docs/ui-shell-memo.md for the locked design.
 
-import { ArrowLeft, Highlighter, Newspaper, Search, Settings, Zap } from "lucide-react";
+import {
+  ArrowLeft,
+  Highlighter,
+  Newspaper,
+  PanelLeftClose,
+  Search,
+  Settings,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -27,6 +35,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 const TOP_LEVEL_ROUTES = ["/", "/search", "/highlights", "/pipeline"] as const;
@@ -52,11 +62,14 @@ const NAV_ITEMS: readonly NavItem[] = [
 
 export function AppSidebar({ contextualContent }: { contextualContent?: React.ReactNode }) {
   const pathname = usePathname();
-  return isTopLevel(pathname) ? (
-    <ShapeA pathname={pathname} contextualContent={contextualContent} />
-  ) : (
-    <ShapeB contextualContent={contextualContent} />
-  );
+  if (isTopLevel(pathname)) {
+    return <ShapeA pathname={pathname} contextualContent={contextualContent} />;
+  }
+  // Settings is a top-level destination from anywhere, so its Back goes
+  // straight to the dashboard rather than the prior history entry (which
+  // is often another settings sub-page after tab clicks).
+  const backHref = pathname.startsWith("/settings") ? "/" : null;
+  return <ShapeB backHref={backHref} contextualContent={contextualContent} />;
 }
 
 function ShapeA({
@@ -67,9 +80,15 @@ function ShapeA({
   contextualContent?: React.ReactNode;
 }) {
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="offcanvas">
+      <SidebarRail />
       <SidebarHeader>
-        <div className="px-2 py-2 font-display text-lg font-medium tracking-tight">HomeNews</div>
+        <Link
+          href="/"
+          className="block rounded-sm px-2 py-2 font-display text-lg font-medium tracking-tight transition-colors hover:text-primary"
+        >
+          HomeNews
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -98,6 +117,9 @@ function ShapeA({
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
+            <CollapseSidebarButton />
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton tooltip="Settings" render={<Link href="/settings" />}>
               <Settings />
               <span>Settings</span>
@@ -109,26 +131,65 @@ function ShapeA({
   );
 }
 
-function ShapeB({ contextualContent }: { contextualContent?: React.ReactNode }) {
+function ShapeB({
+  backHref,
+  contextualContent,
+}: {
+  backHref: string | null;
+  contextualContent?: React.ReactNode;
+}) {
   const router = useRouter();
+  const backButton = backHref ? (
+    <SidebarMenuButton tooltip="Back" render={<Link href={backHref} />}>
+      <ArrowLeft />
+      <span>Back</span>
+    </SidebarMenuButton>
+  ) : (
+    <SidebarMenuButton
+      tooltip="Back"
+      onClick={() => {
+        router.back();
+      }}
+    >
+      <ArrowLeft />
+      <span>Back</span>
+    </SidebarMenuButton>
+  );
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="offcanvas">
+      <SidebarRail />
       <SidebarHeader>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Back"
-              onClick={() => {
-                router.back();
-              }}
-            >
-              <ArrowLeft />
-              <span>Back</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <SidebarMenuItem>{backButton}</SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>{contextualContent}</SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <CollapseSidebarButton />
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
+  );
+}
+
+// Manual fold button — pinned to the sidebar footer (just above Settings in
+// Shape A; alone in Shape B). Mirrors the page-header hamburger that brings
+// the rail back, so the user always has an explicit toggle on either side
+// of the open/closed transition.
+function CollapseSidebarButton() {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <button
+      type="button"
+      onClick={toggleSidebar}
+      aria-label="Collapse sidebar"
+      title="Collapse sidebar"
+      className="flex h-8 w-8 items-center justify-center rounded-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+    >
+      <PanelLeftClose className="h-4 w-4" />
+    </button>
   );
 }

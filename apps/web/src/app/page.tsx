@@ -1,6 +1,7 @@
 import type { AnalyzedArticle, Feed } from "@homenews/shared";
+import { PageHeader } from "@/components/page-header";
+import { RefreshButton } from "@/components/refresh-button";
 import { fetchFeeds, fetchRanked, type RankedFilters } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { ArticleListShell } from "./article-list-shell";
 import { ArticleRow } from "./article-row";
 import { DashboardShell } from "./dashboard-shell";
@@ -76,16 +77,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<Raw
   const avgComposite = Number.isFinite(avgCompositeRaw) ? Math.round(avgCompositeRaw) : 0;
   const sourceCount = new Set(articles.map((a) => a.article.feedName)).size;
 
+  const status = buildStatus(articles.length, total, sourceCount, feeds.length, avgComposite);
+
   return (
     <DashboardShell>
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <DashboardHeader
-          articleCount={articles.length}
-          totalCount={total}
-          sourceCount={sourceCount}
-          feedCount={feeds.length}
-          avgComposite={avgComposite}
-        />
+      <PageHeader title="Dashboard" status={status} actions={<RefreshButton />} />
+      <main className="mx-auto max-w-6xl px-6 py-8">
         <ArticleListShell>
           {articles.length === 0 ? (
             <EmptyState />
@@ -99,127 +96,31 @@ export default async function Home({ searchParams }: { searchParams: Promise<Raw
   );
 }
 
-function DashboardHeader({
-  articleCount,
-  totalCount,
-  sourceCount,
-  feedCount,
-  avgComposite,
-}: {
-  articleCount: number;
-  totalCount: number;
-  sourceCount: number;
-  feedCount: number;
-  avgComposite: number;
-}) {
-  return (
-    <header className="mb-10">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          Today's Briefing
-        </span>
-        <MetricStrip
-          articleCount={articleCount}
-          totalCount={totalCount}
-          sourceCount={sourceCount}
-          feedCount={feedCount}
-          avgComposite={avgComposite}
-        />
-      </div>
-      <h1 className="font-display text-[2.75rem] leading-[1.05] tracking-tight text-foreground">
-        The day in <span className="text-primary">AI</span>.
-      </h1>
-      <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
-        <HeaderDescription
-          articleCount={articleCount}
-          totalCount={totalCount}
-          sourceCount={sourceCount}
-        />
-      </p>
-    </header>
-  );
-}
-
-function HeaderDescription({
-  articleCount,
-  totalCount,
-  sourceCount,
-}: {
-  articleCount: number;
-  totalCount: number;
-  sourceCount: number;
-}) {
-  if (articleCount > 0) {
+function buildStatus(
+  articleCount: number,
+  totalCount: number,
+  sourceCount: number,
+  feedCount: number,
+  avgComposite: number,
+) {
+  if (totalCount === 0) {
     return (
-      <>
-        <span className="text-foreground">{articleCount}</span> of{" "}
-        <span className="text-foreground">{totalCount}</span> articles shown, drawn from{" "}
-        <span className="text-foreground">{sourceCount}</span> active sources. Refine via the filter
-        bar below — all queries run server-side against the full corpus.
-      </>
-    );
-  }
-  if (totalCount > 0) {
-    return (
-      <>
-        No articles match the current filters. <span className="text-foreground">{totalCount}</span>{" "}
-        articles in the corpus overall — loosen or reset filters to find them.
-      </>
+      <span>
+        No articles yet —{" "}
+        <span className="text-foreground/80">run the pipeline to fetch your feeds</span>
+      </span>
     );
   }
   return (
-    <>
-      No articles yet. Trigger a run from the <span className="text-foreground">Pipeline</span> page
-      in the sidebar to fetch the latest from your feeds, or wait for the next scheduled tick.
-    </>
-  );
-}
-
-function MetricStrip({
-  articleCount,
-  totalCount,
-  sourceCount,
-  feedCount,
-  avgComposite,
-}: {
-  articleCount: number;
-  totalCount: number;
-  sourceCount: number;
-  feedCount: number;
-  avgComposite: number;
-}) {
-  return (
-    <div className="hidden items-baseline gap-6 sm:flex">
-      <Metric label="Shown" value={`${articleCount}/${totalCount}`} />
-      <Metric label="Sources" value={`${sourceCount}/${feedCount}`} />
-      <Metric label="Avg score" value={avgComposite} accent />
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number | string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
-      </span>
-      <span
-        className={cn(
-          "tabular font-mono text-[15px] leading-none",
-          accent ? "text-primary" : "text-foreground",
-        )}
-      >
-        {value}
-      </span>
-    </div>
+    <span>
+      <span className="text-foreground">{articleCount}</span>
+      <span className="text-muted-foreground/60"> of </span>
+      <span className="text-foreground">{totalCount.toLocaleString()}</span>
+      <span className="text-muted-foreground/60"> · </span>
+      <span className="text-foreground">{sourceCount}</span>
+      <span className="text-muted-foreground/60">/{feedCount} sources · avg </span>
+      <span className="text-primary">{avgComposite}</span>
+    </span>
   );
 }
 

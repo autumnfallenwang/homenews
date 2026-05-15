@@ -76,12 +76,22 @@ async function run() {
     .returning({ id: feeds.id, url: feeds.url });
   if (googleFix.length > 0) {
     log.info(
-      { event: "migration.feed.url_patched", script: SCRIPT, name: "Google AI Blog", url: googleFix[0].url },
+      {
+        event: "migration.feed.url_patched",
+        script: SCRIPT,
+        name: "Google AI Blog",
+        url: googleFix[0].url,
+      },
       "Google AI Blog URL patched",
     );
   } else {
     log.info(
-      { event: "migration.feed.skipped", script: SCRIPT, name: "Google AI Blog", reason: "not_found" },
+      {
+        event: "migration.feed.skipped",
+        script: SCRIPT,
+        name: "Google AI Blog",
+        reason: "not_found",
+      },
       "Google AI Blog row not found, skipping URL patch",
     );
   }
@@ -116,7 +126,12 @@ async function run() {
     );
   } else {
     log.info(
-      { event: "migration.feed.skipped", script: SCRIPT, name: "VentureBeat AI", reason: "not_found" },
+      {
+        event: "migration.feed.skipped",
+        script: SCRIPT,
+        name: "VentureBeat AI",
+        reason: "not_found",
+      },
       "VentureBeat AI row not found, skipping disable",
     );
   }
