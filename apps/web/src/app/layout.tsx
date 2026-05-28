@@ -31,6 +31,11 @@ const display = Fraunces({
 export const metadata: Metadata = {
   title: "HomeNews",
   description: "Personal AI news intelligence",
+  manifest: "/manifest.json",
+  icons: [
+    { rel: "icon", url: "/icon.svg", type: "image/svg+xml" },
+    { rel: "apple-touch-icon", url: "/icon-192.png" },
+  ],
 };
 
 export default async function RootLayout({
