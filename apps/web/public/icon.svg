@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1f1b16"/>
+  <rect x="56" y="120" width="400" height="320" rx="24" fill="#f5ead8"/>
+  <rect x="88" y="156" width="336" height="20" rx="6" fill="#1f1b16"/>
+  <rect x="88" y="192" width="220" height="10" rx="4" fill="#1f1b16" opacity="0.55"/>
+  <rect x="88" y="212" width="180" height="10" rx="4" fill="#1f1b16" opacity="0.35"/>
+  <text x="256" y="380" text-anchor="middle" font-family="'Fraunces','Times New Roman',serif" font-size="180" font-weight="800" fill="#c8772a">HN</text>
+</svg>
