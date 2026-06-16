@@ -21,6 +21,39 @@ spec:
     spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Gate API startup on DB reachability. The API runs DB-dependent boot work
+      # (seed defaults + resolve the fetch schedule) the instant it starts; if
+      # the DB Service isn't DNS-resolvable yet (e.g. api + db restart together
+      # after a node reboot) those queries fail. The app now retries, but
+      # blocking here keeps the common case clean. Reuses the DB image so
+      # pg_isready is available with no extra pull.
+      initContainers:
+        - name: wait-for-db
+          image: "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
+          imagePullPolicy: {{ .Values.db.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
+                echo "waiting for database $DB_HOST:$DB_PORT"
+                sleep 2
+              done
+          env:
+            - name: DB_HOST
+              value: {{ include "homenews.fullname" (dict "context" . "component" "db") | quote }}
+            - name: DB_PORT
+              value: {{ .Values.db.service.port | quote }}
+            - name: DB_USER
+              value: {{ .Values.db.env.POSTGRES_USER | quote }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
       containers:
         - name: api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
