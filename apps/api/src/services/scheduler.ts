@@ -5,19 +5,29 @@ import { getSetting } from "./settings.js";
 
 let task: ScheduledTask | null = null;
 let currentSchedule: string | null = null;
+let reconcileTimer: ReturnType<typeof setInterval> | null = null;
 
 const DEFAULT_SCHEDULE = "0 */2 * * *";
+const DEFAULT_RECONCILE_INTERVAL_MS = 5 * 60_000;
 
-/** Read the cron expression from settings, falling back to the hardcoded
- *  default if the setting is missing or unreadable. */
+/**
+ * Read the cron expression from settings.
+ *
+ * Only a genuinely absent/empty setting falls back to `DEFAULT_SCHEDULE`.
+ * A database error is NOT swallowed: `getSetting` throws only when the DB is
+ * unreachable (for a known key like `fetch_interval` it otherwise returns the
+ * stored row or the code default), and we let that propagate.
+ *
+ * The old `catch {}` here was the root cause of the "12h setting, 2h runs"
+ * incident: when the API booted before the DB Service was DNS-resolvable
+ * (`getaddrinfo ENOTFOUND homenews-db`), this silently returned the 2h default
+ * and the wrong cadence stuck until the next reboot or manual save. Callers
+ * (boot retry loop, periodic reconciler, settings PATCH) now retry instead.
+ */
 async function resolveSchedule(): Promise<string> {
-  try {
-    const fromSettings = await getSetting<string>("fetch_interval");
-    if (typeof fromSettings === "string" && fromSettings.trim().length > 0) {
-      return fromSettings;
-    }
-  } catch {
-    // fall through to default
+  const fromSettings = await getSetting<string>("fetch_interval");
+  if (typeof fromSettings === "string" && fromSettings.trim().length > 0) {
+    return fromSettings;
   }
   return DEFAULT_SCHEDULE;
 }
@@ -98,5 +108,37 @@ export function stopScheduler(): void {
     task = null;
     currentSchedule = null;
     log.info({ event: "scheduler.stopped" }, "scheduler stopped");
+  }
+}
+
+/**
+ * Periodically re-apply the schedule from settings as a self-healing safety
+ * net. `applyScheduleFromSettings` no-ops when the resolved cron already
+ * matches the running task, so this only restarts node-cron when the value
+ * actually drifts — e.g. a boot that couldn't reach the DB and never started a
+ * task, or an out-of-band change to `fetch_interval` in the database. Errors
+ * are logged and swallowed; the next tick retries.
+ */
+export function startScheduleReconciler(intervalMs = DEFAULT_RECONCILE_INTERVAL_MS): void {
+  if (reconcileTimer) return;
+  reconcileTimer = setInterval(() => {
+    applyScheduleFromSettings().catch((err) => {
+      log.warn(
+        {
+          event: "scheduler.reconcile.failed",
+          err: err instanceof Error ? err : new Error(String(err)),
+        },
+        "periodic schedule reconcile failed",
+      );
+    });
+  }, intervalMs);
+  // A reconcile timer must never keep the process alive on its own.
+  reconcileTimer.unref?.();
+}
+
+export function stopScheduleReconciler(): void {
+  if (reconcileTimer) {
+    clearInterval(reconcileTimer);
+    reconcileTimer = null;
   }
 }
