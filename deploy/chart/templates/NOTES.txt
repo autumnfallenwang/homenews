@@ -13,7 +13,7 @@ Trigger an end-to-end pipeline run:
   curl -X POST http://{{ .Values.api.ingress.host }}/admin/pipeline/run-all
 
 Loki history (30d retention for {namespace="homenews"}):
-  curl -sG http://loki.arch.local/loki/api/v1/query_range \
+  curl -sG http://loki.arch.internal/loki/api/v1/query_range \
     --data-urlencode 'query={namespace="{{ .Release.Namespace }}"} | json | event="http.request"' \
     --data-urlencode "start=$(date -u -d '-30 min' +%s)000000000" \
     --data-urlencode "end=$(date -u +%s)000000000"

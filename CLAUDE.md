@@ -50,7 +50,7 @@ So dev reads `apps/api/.env` (gitignored, copy from `.env.example`); prod reads 
 - **DB**: `./scripts/db-start.sh` spins up a local `homenews-postgres` container on `localhost:5433` (pgvector/pgvector:pg17, named volume `homenews-pgdata`). Separate from the cluster's data — refactors and replays can't touch prod.
   - `./scripts/db-stop.sh` to stop, `./scripts/db-reset.sh` to wipe + recreate.
   - First-time setup: `pnpm --filter @homenews/api exec drizzle-kit push` applies the schema to the empty local DB.
-- **LLM gateway**: dev reuses the cluster's llmgw via the existing ingress at `http://llmgw.arch.local` (Traefik on the same host, `/etc/hosts` already routes it). No separate dev gateway process to manage.
+- **LLM gateway**: dev reuses the cluster's llmgw via the existing ingress at `http://llmgw.arch.internal` (Traefik on the same host, `/etc/hosts` already routes it). No separate dev gateway process to manage.
 
 **Dev workflow:**
 
@@ -69,10 +69,10 @@ Prod lives in the k3s cluster managed by `arch-infra`. ArgoCD owns the lifecycle
 
 **Browse + observe:**
 
-- ArgoCD UI: <http://argocd.arch.local> — sync status, drift, manual sync
-- Grafana (Loki): <http://grafana.arch.local> — log search with full `event` / `req_id` / `run_id` schema
-- Web app: <http://homenews.arch.local>
-- API: <http://homenews-api.arch.local>
+- ArgoCD UI: <http://argocd.arch.internal> — sync status, drift, manual sync
+- Grafana (Loki): <http://grafana.arch.internal> — log search with full `event` / `req_id` / `run_id` schema
+- Web app: <http://homenews.arch.internal>
+- API: <http://homenews-api.arch.internal>
 - `kubectl get pod,svc,ingress -n homenews` — quick health check from terminal
 
 **Lifecycle (rare manual cases — usually ArgoCD does this):**
@@ -85,7 +85,7 @@ Prod lives in the k3s cluster managed by `arch-infra`. ArgoCD owns the lifecycle
 **Logs:**
 
 - `kubectl logs -n homenews deploy/homenews-api -f` — real-time tail (single pod)
-- Loki for history (30d retention), e.g. `curl -sG http://loki.arch.local/loki/api/v1/query_range --data-urlencode 'query={namespace="homenews"} | json | run_id="<id>"' --data-urlencode "start=$(date -u -d '-1 hour' +%s)000000000" --data-urlencode "end=$(date -u +%s)000000000"`
+- Loki for history (30d retention), e.g. `curl -sG http://loki.arch.internal/loki/api/v1/query_range --data-urlencode 'query={namespace="homenews"} | json | run_id="<id>"' --data-urlencode "start=$(date -u -d '-1 hour' +%s)000000000" --data-urlencode "end=$(date -u +%s)000000000"`
 
 **Database (run inside the api pod, which has `tsx` + `drizzle-kit`):**
 
