@@ -70,7 +70,7 @@ jobs:
           # Only the web image bakes the API URL into the client bundle
           # (Next.js inlines NEXT_PUBLIC_* values at build time). API needs no build args.
           build-args: |
-            ${{ matrix.component == 'web' && 'NEXT_PUBLIC_API_URL=http://homenews-api.arch.local' || '' }}
+            ${{ matrix.component == 'web' && 'NEXT_PUBLIC_API_URL=http://homenews-api.arch.internal' || '' }}
           # Separate cache scopes — api and web have unrelated dep trees,
           # sharing one cache would thrash constantly.
           cache-from: type=gha,scope=${{ matrix.component }}

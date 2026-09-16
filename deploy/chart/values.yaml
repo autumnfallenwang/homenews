@@ -22,7 +22,7 @@ api:
   ingress:
     enabled: true
     className: traefik
-    host: homenews-api.arch.local
+    host: homenews-api.arch.internal
   env:
     API_PORT: "52001"
     # In-cluster Service DNS for DB + LLM gateway (llmgw migrated to k3s).
@@ -61,7 +61,7 @@ web:
   ingress:
     enabled: true
     className: traefik
-    host: homenews.arch.local
+    host: homenews.arch.internal
   env:
     PORT: "52000"
     HOSTNAME: "0.0.0.0"

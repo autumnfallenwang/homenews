@@ -25,7 +25,7 @@ spec:
           # NEXT_PUBLIC_API_URL is baked into the client bundle at build time
           # (Dockerfile.web ARG), NOT passed through env at runtime — Next.js
           # inlines NEXT_PUBLIC_* values during `next build`. The GHA workflow
-          # (Task 110) passes --build-arg NEXT_PUBLIC_API_URL=http://homenews-api.arch.local.
+          # (Task 110) passes --build-arg NEXT_PUBLIC_API_URL=http://homenews-api.arch.internal.
           image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
           imagePullPolicy: {{ .Values.web.image.pullPolicy }}
           securityContext:
