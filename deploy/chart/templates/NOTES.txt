@@ -12,8 +12,9 @@ Tail logs:
 Trigger an end-to-end pipeline run:
   curl -X POST http://{{ .Values.api.ingress.host }}/admin/pipeline/run-all
 
-Loki history (30d retention for {namespace="homenews"}):
-  curl -sG http://loki.observability.svc.cluster.local:3100/loki/api/v1/query_range \
+Loki history (30d retention for {namespace="homenews"}), in Grafana Explore at http://grafana.arch.internal, or from a shell:
+  kubectl -n observability port-forward svc/loki 3100:3100 &
+  curl -sG http://localhost:3100/loki/api/v1/query_range \
     --data-urlencode 'query={namespace="{{ .Release.Namespace }}"} | json | event="http.request"' \
     --data-urlencode "start=$(date -u -d '-30 min' +%s)000000000" \
     --data-urlencode "end=$(date -u +%s)000000000"
