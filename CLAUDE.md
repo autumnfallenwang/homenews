@@ -85,7 +85,7 @@ Prod lives in the k3s cluster managed by `arch-infra`. ArgoCD owns the lifecycle
 **Logs:**
 
 - `kubectl logs -n homenews deploy/homenews-api -f` — real-time tail (single pod)
-- Loki for history (30d retention), e.g. `curl -sG http://loki.arch.internal/loki/api/v1/query_range --data-urlencode 'query={namespace="homenews"} | json | run_id="<id>"' --data-urlencode "start=$(date -u -d '-1 hour' +%s)000000000" --data-urlencode "end=$(date -u +%s)000000000"`
+- Loki for history (30d retention), e.g. `curl -sG http://loki.observability.svc.cluster.local:3100/loki/api/v1/query_range --data-urlencode 'query={namespace="homenews"} | json | run_id="<id>"' --data-urlencode "start=$(date -u -d '-1 hour' +%s)000000000" --data-urlencode "end=$(date -u +%s)000000000"`
 
 **Database (run inside the api pod, which has `tsx` + `drizzle-kit`):**
 
