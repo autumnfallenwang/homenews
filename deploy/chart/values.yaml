@@ -27,7 +27,7 @@ api:
     API_PORT: "52001"
     # In-cluster Service DNS for DB + LLM gateway (llmgw migrated to k3s).
     DATABASE_URL: postgres://homenews:homenews@homenews-db:5432/homenews
-    LLM_GATEWAY_URL: http://llmgw.llmgw
+    LLM_GATEWAY_URL: http://llmgw.llmgw.svc.cluster.local
     LOG_LEVEL: info
   resources:
     requests:

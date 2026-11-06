@@ -50,7 +50,7 @@ So dev reads `apps/api/.env` (gitignored, copy from `.env.example`); prod reads 
 - **DB**: `./scripts/db-start.sh` spins up a local `homenews-postgres` container on `localhost:5433` (pgvector/pgvector:pg17, named volume `homenews-pgdata`). Separate from the cluster's data — refactors and replays can't touch prod.
   - `./scripts/db-stop.sh` to stop, `./scripts/db-reset.sh` to wipe + recreate.
   - First-time setup: `pnpm --filter @homenews/api exec drizzle-kit push` applies the schema to the empty local DB.
-- **LLM gateway**: dev reuses the cluster's llmgw via the existing ingress at `http://llmgw.arch.internal` (Traefik on the same host, `/etc/hosts` already routes it). No separate dev gateway process to manage.
+- **LLM gateway**: dev reuses the cluster's llmgw at `http://llmgw.llmgw.svc.cluster.local` (only reachable from arch, where `/etc/hosts` points that name at the Service IP). No separate dev gateway process to manage.
 
 **Dev workflow:**
 
